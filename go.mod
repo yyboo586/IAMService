@@ -8,7 +8,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/smartystreets/goconvey v1.8.1
 	github.com/stretchr/testify v1.9.0
-	github.com/yyboo586/utils v0.0.0-20241025081127-97d95bcbeca6
+	github.com/yyboo586/utils v0.0.0-20241027101809-d9412c736406
 	golang.org/x/crypto v0.28.0
 )
 
@@ -21,6 +21,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.6 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
+	github.com/go-jose/go-jose/v4 v4.0.4 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.22.1 // indirect

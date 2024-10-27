@@ -3,13 +3,16 @@ package logics
 import (
 	"ServiceA/dbaccess"
 	"ServiceA/interfaces"
+	"crypto/rsa"
 	"net/http"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
 
+	myjwt "github.com/yyboo586/utils/myJWT"
 	"github.com/yyboo586/utils/rest"
+
 	"github.com/yyboo586/utils/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -20,17 +23,19 @@ var (
 )
 
 type user struct {
-	pwdRegex  *regexp.Regexp
-	nameRegex *regexp.Regexp
-	dbUser    interfaces.DBUser
+	pwdRegex   *regexp.Regexp
+	nameRegex  *regexp.Regexp
+	privateKey *rsa.PrivateKey
+	dbUser     interfaces.DBUser
 }
 
 func NewUser() *user {
 	uOnce.Do(func() {
 		u = &user{
-			pwdRegex:  regexp.MustCompile(`^[a-zA-Z0-9]{6,12}$`),
-			nameRegex: regexp.MustCompile(`^[\p{Han}a-zA-Z0-9]{1,6}$`),
-			dbUser:    dbaccess.NewUser(),
+			pwdRegex:   regexp.MustCompile(`^[a-zA-Z0-9]{6,12}$`),
+			nameRegex:  regexp.MustCompile(`^[\p{Han}a-zA-Z0-9]{1,6}$`),
+			privateKey: privateKey,
+			dbUser:     dbaccess.NewUser(),
 		}
 	})
 	return u
@@ -63,9 +68,10 @@ func (u *user) Create(user *interfaces.User) (err error) {
 	return u.dbUser.Create(user)
 }
 
-func (u *user) Login(name, passwd string) (id string, err error) {
+func (u *user) Login(name, passwd string) (id string, jwtTokenStr string, err error) {
 	if name == "" || passwd == "" {
-		return "", rest.NewHTTPError(http.StatusBadRequest, "invalid name or password", nil)
+		err = rest.NewHTTPError(http.StatusBadRequest, "invalid name or password", nil)
+		return
 	}
 
 	// 引入固定时间延迟
@@ -79,19 +85,28 @@ func (u *user) Login(name, passwd string) (id string, err error) {
 
 	user, exists, err := u.dbUser.FetchByName(name)
 	if err != nil {
-		return "", rest.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
+		err = rest.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
+		return
 	}
 	if !exists {
-		return "", rest.NewHTTPError(http.StatusBadRequest, "invalid name or password", nil)
+		err = rest.NewHTTPError(http.StatusBadRequest, "invalid name or password", nil)
+		return
 	}
 
 	if err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(passwd)); err != nil {
-		return "", rest.NewHTTPError(http.StatusBadRequest, "invalid name or password", nil)
+		err = rest.NewHTTPError(http.StatusBadRequest, "invalid name or password", nil)
+		return
 	}
 
 	if err = u.dbUser.UpdateLoginTime(user.ID); err != nil {
-		return "", rest.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
+		err = rest.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
+		return
 	}
 
-	return user.ID, nil
+	if jwtTokenStr, err = myjwt.Sign(user.ID, nil, u.privateKey); err != nil {
+		err = rest.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
+		return
+	}
+
+	return user.ID, jwtTokenStr, nil
 }

@@ -63,11 +63,16 @@ func (u *UserHandler) login(c *gin.Context) {
 	name := i.(map[string]interface{})["name"].(string)
 	password := i.(map[string]interface{})["password"].(string)
 
-	id, err := u.logicsUser.Login(name, password)
+	id, jwtTokenStr, err := u.logicsUser.Login(name, password)
 	if err != nil {
 		rest.ReplyError(c, err)
 		return
 	}
 
-	rest.ReplyOK(c, http.StatusOK, map[string]interface{}{"id": id})
+	data := map[string]interface{}{
+		"id":    id,
+		"token": jwtTokenStr,
+	}
+
+	rest.ReplyOK(c, http.StatusOK, data)
 }

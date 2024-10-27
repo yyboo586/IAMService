@@ -3,8 +3,11 @@ package logics
 import (
 	"ServiceA/interfaces"
 	"ServiceA/interfaces/mock"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"regexp"
 	"testing"
@@ -17,10 +20,23 @@ import (
 )
 
 func newUser(dbUser interfaces.DBUser) *user {
+	// 解码 PEM 格式的私钥
+	block, _ := pem.Decode([]byte(privateKeyPEM))
+	if block == nil || block.Type != "RSA PRIVATE KEY" {
+		log.Fatal("failed to decode PEM block containing the private key")
+	}
+
+	// 解析私钥
+	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		log.Fatal("failed to parse private key:", err)
+	}
+
 	return &user{
-		pwdRegex:  regexp.MustCompile(`^[a-zA-Z0-9]{6,12}$`),
-		nameRegex: regexp.MustCompile(`^[\p{Han}a-zA-Z0-9]{1,6}$`),
-		dbUser:    dbUser,
+		pwdRegex:   regexp.MustCompile(`^[a-zA-Z0-9]{6,12}$`),
+		nameRegex:  regexp.MustCompile(`^[\p{Han}a-zA-Z0-9]{1,6}$`),
+		privateKey: privateKey,
+		dbUser:     dbUser,
 	}
 }
 
@@ -159,7 +175,7 @@ func TestLogin(t *testing.T) {
 
 			for _, tc := range testCases {
 				Convey(fmt.Sprintf("登录失败，用户名: %s, 密码: %s", tc.name, tc.passwd), func() {
-					id, err := user.Login(tc.name, tc.passwd)
+					id, _, err := user.Login(tc.name, tc.passwd)
 
 					assert.Equal(t, "", id)
 					assert.Equal(t, tc.expectedErr, err)
@@ -170,7 +186,7 @@ func TestLogin(t *testing.T) {
 		Convey("数据库错误, FetchByName failed", func() {
 			dbUser.EXPECT().FetchByName(gomock.Any()).Return(nil, false, errors.New("database error"))
 
-			id, err := user.Login("tom", "123456")
+			id, _, err := user.Login("tom", "123456")
 
 			assert.Equal(t, "", id)
 			assert.Equal(t, rest.NewHTTPError(http.StatusInternalServerError, "database error", nil), err)
@@ -179,7 +195,7 @@ func TestLogin(t *testing.T) {
 		Convey("用户名不存在", func() {
 			dbUser.EXPECT().FetchByName(gomock.Any()).Return(nil, false, nil)
 
-			id, err := user.Login("nonexistent", "123456")
+			id, _, err := user.Login("nonexistent", "123456")
 
 			assert.Equal(t, "", id)
 			assert.Equal(t, rest.NewHTTPError(http.StatusBadRequest, "invalid name or password", nil), err)
@@ -190,7 +206,7 @@ func TestLogin(t *testing.T) {
 
 			dbUser.EXPECT().FetchByName(gomock.Any()).Return(&interfaces.User{ID: "1", Name: "tom", Password: string(hashedPassword)}, true, nil)
 
-			id, err := user.Login("tom", "wrongpassword")
+			id, _, err := user.Login("tom", "wrongpassword")
 
 			assert.Equal(t, "", id)
 			assert.Equal(t, rest.NewHTTPError(http.StatusBadRequest, "invalid name or password", nil), err)
@@ -202,7 +218,7 @@ func TestLogin(t *testing.T) {
 			dbUser.EXPECT().FetchByName(gomock.Any()).Return(&interfaces.User{ID: "1", Name: "tom", Password: string(hashedPassword)}, true, nil)
 			dbUser.EXPECT().UpdateLoginTime(gomock.Any()).Return(errors.New("database error"))
 
-			id, err := user.Login("tom", "123456")
+			id, _, err := user.Login("tom", "123456")
 
 			assert.Equal(t, "", id)
 			assert.Equal(t, rest.NewHTTPError(http.StatusInternalServerError, "database error", nil), err)
@@ -213,7 +229,7 @@ func TestLogin(t *testing.T) {
 			dbUser.EXPECT().FetchByName(gomock.Any()).Return(&interfaces.User{ID: "1", Name: "tom", Password: string(hashedPassword)}, true, nil)
 			dbUser.EXPECT().UpdateLoginTime(gomock.Any()).Return(nil)
 
-			id, err := user.Login("tom", "123456")
+			id, _, err := user.Login("tom", "123456")
 			assert.Equal(t, "1", id)
 			assert.Equal(t, nil, err)
 		})

@@ -89,7 +89,7 @@ func TestLogin(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 
 		Convey("Failed", func() {
-			mockLogicsUser.EXPECT().Login(user.Name, user.Password).Return("", errors.New("internal error"))
+			mockLogicsUser.EXPECT().Login(user.Name, user.Password).Return("", "", errors.New("internal error"))
 
 			w := httptest.NewRecorder()
 			engine.ServeHTTP(w, req)
@@ -101,7 +101,7 @@ func TestLogin(t *testing.T) {
 		})
 
 		Convey("Success", func() {
-			mockLogicsUser.EXPECT().Login(user.Name, user.Password).Return("id", nil)
+			mockLogicsUser.EXPECT().Login(user.Name, user.Password).Return("id", "", nil)
 
 			w := httptest.NewRecorder()
 			engine.ServeHTTP(w, req)

@@ -5,6 +5,6 @@ package interfaces
 type LogicsUser interface {
 	// Create creates a new user
 	Create(user *User) error
-	// Login validate password and return user id
-	Login(name, password string) (string, error)
+	// Login validate password and return user id, jwtToken
+	Login(name, password string) (string, string, error)
 }
