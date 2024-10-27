@@ -38,7 +38,9 @@ func TestCreate(t *testing.T) {
 				Name:     "test",
 				Password: "123456",
 			}
-			mock.ExpectExec("insert").WithArgs(u.ID, u.Name, u.Password).WillReturnResult(sqlmock.NewResult(1, 1))
+			mock.ExpectBegin()
+			mock.ExpectExec("insert into t_user \\(id, name, password\\) values\\(\\?, \\?, \\?\\)").WithArgs(u.ID, u.Name, u.Password).WillReturnResult(sqlmock.NewResult(1, 1))
+			mock.ExpectCommit()
 
 			err = dbUser.Create(u)
 
@@ -49,7 +51,62 @@ func TestCreate(t *testing.T) {
 			}
 		})
 	})
+}
 
+func TestGetUserInfoByID(t *testing.T) {
+	Convey("Test DBUser GetUserInfoByID()", t, func() {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+		}
+		defer db.Close()
+
+		dbUser := newUser(db)
+
+		Convey("数据不存在", func() {
+			mock.ExpectQuery("select").WithArgs("NonExistUser").WillReturnError(sql.ErrNoRows)
+
+			_, exists, err := dbUser.GetUserInfoByID("NonExistUser")
+
+			assert.Equal(t, nil, err)
+			assert.Equal(t, false, exists)
+
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("there were unfulfilled expectations: %s", err)
+			}
+		})
+
+		Convey("数据库错误", func() {
+			mock.ExpectQuery("select").WithArgs("dbError").WillReturnError(errDatabase)
+
+			_, _, err := dbUser.GetUserInfoByID("dbError")
+
+			assert.Equal(t, errDatabase, err)
+
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("there were unfulfilled expectations: %s", err)
+			}
+		})
+
+		Convey("数据存在，读取成功", func() {
+			u := &interfaces.User{
+				ID:   "id",
+				Name: "tom",
+			}
+			rows := sqlmock.NewRows([]string{"id", "name"}).AddRow(u.ID, u.Name)
+			mock.ExpectQuery("select").WithArgs(u.ID).WillReturnRows(rows)
+
+			userInfo, exists, err := dbUser.GetUserInfoByID(u.ID)
+
+			assert.Equal(t, nil, err)
+			assert.Equal(t, true, exists)
+			assert.Equal(t, u, userInfo)
+
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("there were unfulfilled expectations: %s", err)
+			}
+		})
+	})
 }
 
 func TestFetchByName(t *testing.T) {
@@ -96,10 +153,11 @@ func TestFetchByName(t *testing.T) {
 			rows := sqlmock.NewRows([]string{"id", "name", "password"}).AddRow(u.ID, u.Name, u.Password)
 			mock.ExpectQuery("select").WithArgs(u.Name).WillReturnRows(rows)
 
-			_, exists, err := dbUser.FetchByName(u.Name)
+			userInfo, exists, err := dbUser.FetchByName(u.Name)
 
 			assert.Equal(t, nil, err)
 			assert.Equal(t, true, exists)
+			assert.Equal(t, u, userInfo)
 
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("there were unfulfilled expectations: %s", err)

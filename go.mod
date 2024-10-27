@@ -8,7 +8,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/smartystreets/goconvey v1.8.1
 	github.com/stretchr/testify v1.9.0
-	github.com/yyboo586/utils v0.0.0-20241027101809-d9412c736406
+	github.com/yyboo586/utils v0.0.0-20241027142926-503e3e1ee92f
 	golang.org/x/crypto v0.28.0
 )
 

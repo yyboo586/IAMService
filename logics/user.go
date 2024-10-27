@@ -3,6 +3,7 @@ package logics
 import (
 	"ServiceA/dbaccess"
 	"ServiceA/interfaces"
+	"context"
 	"crypto/rsa"
 	"net/http"
 	"regexp"
@@ -33,7 +34,7 @@ func NewUser() *user {
 	uOnce.Do(func() {
 		u = &user{
 			pwdRegex:   regexp.MustCompile(`^[a-zA-Z0-9]{6,12}$`),
-			nameRegex:  regexp.MustCompile(`^[\p{Han}a-zA-Z0-9]{1,6}$`),
+			nameRegex:  regexp.MustCompile(`^[\p{Han}a-zA-Z0-9]{1,10}$`),
 			privateKey: privateKey,
 			dbUser:     dbaccess.NewUser(),
 		}
@@ -103,10 +104,35 @@ func (u *user) Login(name, passwd string) (id string, jwtTokenStr string, err er
 		return
 	}
 
-	if jwtTokenStr, err = myjwt.Sign(user.ID, nil, u.privateKey); err != nil {
+	claims := map[string]interface{}{
+		"id":   user.ID,
+		"name": user.Name,
+	}
+	if jwtTokenStr, err = myjwt.Sign(user.ID, claims, u.privateKey); err != nil {
 		err = rest.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
 		return
 	}
 
 	return user.ID, jwtTokenStr, nil
+}
+
+func (u *user) GetUserInfo(ctx context.Context, id string) (userInfo *interfaces.User, err error) {
+	_, err = myjwt.Verify(ctx.Value(interfaces.TokenKey).(string), u.privateKey)
+	if err != nil {
+		err = rest.NewHTTPError(http.StatusUnauthorized, err.Error(), nil)
+		return
+	}
+
+	var exists bool
+	userInfo, exists, err = u.dbUser.GetUserInfoByID(id)
+	if err != nil {
+		err = rest.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
+		return
+	}
+	if !exists {
+		err = rest.NewHTTPError(http.StatusNotFound, "user not found", nil)
+		return
+	}
+
+	return
 }

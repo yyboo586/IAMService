@@ -3,7 +3,9 @@ package driveradapters
 import (
 	"ServiceA/interfaces"
 	"ServiceA/logics"
+	"context"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/gin-gonic/gin"
@@ -29,6 +31,8 @@ func NewUserHandler() *UserHandler {
 }
 
 func (u *UserHandler) RegisterPublic(engine *gin.Engine) {
+	engine.Handle(http.MethodGet, "/api/v1/ServiceA/users/:id", u.getUserInfo)
+
 	engine.Handle(http.MethodPost, "/api/v1/ServiceA/users", u.create)
 	engine.Handle(http.MethodPost, "/api/v1/ServiceA/user-login", u.login)
 }
@@ -73,6 +77,23 @@ func (u *UserHandler) login(c *gin.Context) {
 		"id":    id,
 		"token": jwtTokenStr,
 	}
+	rest.ReplyOK(c, http.StatusOK, data)
+}
 
+func (u *UserHandler) getUserInfo(c *gin.Context) {
+	id := c.Param("id")
+	jwtTokenStr := strings.Split(c.GetHeader("Authorization"), " ")[1]
+	ctx := context.WithValue(context.Background(), interfaces.TokenKey, jwtTokenStr)
+
+	userInfo, err := u.logicsUser.GetUserInfo(ctx, id)
+	if err != nil {
+		rest.ReplyError(c, err)
+		return
+	}
+
+	data := map[string]interface{}{
+		"id":   userInfo.ID,
+		"name": userInfo.Name,
+	}
 	rest.ReplyOK(c, http.StatusOK, data)
 }

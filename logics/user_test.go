@@ -3,6 +3,7 @@ package logics
 import (
 	"ServiceA/interfaces"
 	"ServiceA/interfaces/mock"
+	"context"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
@@ -15,6 +16,7 @@ import (
 	"github.com/golang/mock/gomock"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
+	myjwt "github.com/yyboo586/utils/myJWT"
 	"github.com/yyboo586/utils/rest"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -232,6 +234,59 @@ func TestLogin(t *testing.T) {
 			id, _, err := user.Login("tom", "123456")
 			assert.Equal(t, "1", id)
 			assert.Equal(t, nil, err)
+		})
+	})
+}
+
+func TestGetUserInfo(t *testing.T) {
+	Convey("GetUserInfo", t, func() {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		dbUser := mock.NewMockDBUser(ctrl)
+		user := newUser(dbUser)
+
+		Convey("jwt token 解析失败", func() {
+			ctx := context.WithValue(context.Background(), interfaces.TokenKey, "invalid jwt token")
+
+			_, err := user.GetUserInfo(ctx, "id")
+
+			assert.Equal(t, rest.NewHTTPError(http.StatusUnauthorized, "go-jose/go-jose: compact JWS format must have three parts", nil), err)
+		})
+
+		Convey("数据库错误", func() {
+			jwtTokenStr, _ := myjwt.Sign("id", map[string]interface{}{"id": "id"}, user.privateKey)
+			ctx := context.WithValue(context.Background(), interfaces.TokenKey, jwtTokenStr)
+
+			dbUser.EXPECT().GetUserInfoByID(gomock.Any()).Return(nil, false, errors.New("database error"))
+
+			_, err = user.GetUserInfo(ctx, "id")
+
+			assert.Equal(t, rest.NewHTTPError(http.StatusInternalServerError, "database error", nil), err)
+		})
+
+		Convey("用户不存在", func() {
+			jwtTokenStr, _ := myjwt.Sign("id", map[string]interface{}{"id": "id"}, user.privateKey)
+			ctx := context.WithValue(context.Background(), interfaces.TokenKey, jwtTokenStr)
+
+			dbUser.EXPECT().GetUserInfoByID(gomock.Any()).Return(nil, false, nil)
+
+			_, err = user.GetUserInfo(ctx, "id")
+
+			assert.Equal(t, rest.NewHTTPError(http.StatusNotFound, "user not found", nil), err)
+		})
+
+		Convey("获取用户信息成功", func() {
+			jwtTokenStr, _ := myjwt.Sign("id", map[string]interface{}{"id": "id"}, user.privateKey)
+			ctx := context.WithValue(context.Background(), interfaces.TokenKey, jwtTokenStr)
+
+			dbUser.EXPECT().GetUserInfoByID(gomock.Any()).Return(&interfaces.User{ID: "1", Name: "tom"}, true, nil)
+
+			userInfo, err := user.GetUserInfo(ctx, "id")
+
+			assert.Equal(t, nil, err)
+			assert.Equal(t, "1", userInfo.ID)
+			assert.Equal(t, "tom", userInfo.Name)
 		})
 	})
 }
