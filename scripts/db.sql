@@ -10,4 +10,4 @@ CREATE TABLE IF NOT EXISTS `t_user`(
     PRIMARY KEY (`id`),
     UNIQUE KEY `idx_name` (`name`),
     KEY `idx_last_login_at` (`last_login_at`)
-)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户信息';

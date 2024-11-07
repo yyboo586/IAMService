@@ -3,9 +3,7 @@ package driveradapters
 import (
 	"ServiceA/interfaces"
 	"ServiceA/logics"
-	"context"
 	"net/http"
-	"strings"
 	"sync"
 
 	"github.com/gin-gonic/gin"
@@ -82,10 +80,8 @@ func (u *UserHandler) login(c *gin.Context) {
 
 func (u *UserHandler) getUserInfo(c *gin.Context) {
 	id := c.Param("id")
-	jwtTokenStr := strings.Split(c.GetHeader("Authorization"), " ")[1]
-	ctx := context.WithValue(context.Background(), interfaces.TokenKey, jwtTokenStr)
 
-	userInfo, err := u.logicsUser.GetUserInfo(ctx, id)
+	userInfo, err := u.logicsUser.GetUserInfo(c.Request.Context(), id)
 	if err != nil {
 		rest.ReplyError(c, err)
 		return

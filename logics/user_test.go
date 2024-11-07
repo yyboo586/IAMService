@@ -246,14 +246,6 @@ func TestGetUserInfo(t *testing.T) {
 		dbUser := mock.NewMockDBUser(ctrl)
 		user := newUser(dbUser)
 
-		Convey("jwt token 解析失败", func() {
-			ctx := context.WithValue(context.Background(), interfaces.TokenKey, "invalid jwt token")
-
-			_, err := user.GetUserInfo(ctx, "id")
-
-			assert.Equal(t, rest.NewHTTPError(http.StatusUnauthorized, "go-jose/go-jose: compact JWS format must have three parts", nil), err)
-		})
-
 		Convey("数据库错误", func() {
 			jwtTokenStr, _ := myjwt.Sign("id", map[string]interface{}{"id": "id"}, user.privateKey)
 			ctx := context.WithValue(context.Background(), interfaces.TokenKey, jwtTokenStr)

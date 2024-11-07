@@ -117,11 +117,7 @@ func (u *user) Login(name, passwd string) (id string, jwtTokenStr string, err er
 }
 
 func (u *user) GetUserInfo(ctx context.Context, id string) (userInfo *interfaces.User, err error) {
-	_, err = myjwt.Verify(ctx.Value(interfaces.TokenKey).(string), u.privateKey)
-	if err != nil {
-		err = rest.NewHTTPError(http.StatusUnauthorized, err.Error(), nil)
-		return
-	}
+	// log.Printf("DEBUG: ExtClaims: %v, jwtToken: %v\n", ctx.Value(interfaces.ClaimsKey).(map[string]interface{}), ctx.Value(interfaces.TokenKey).(string))
 
 	var exists bool
 	userInfo, exists, err = u.dbUser.GetUserInfoByID(id)

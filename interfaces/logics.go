@@ -7,7 +7,8 @@ import "context"
 type contextKey string
 
 const (
-	TokenKey contextKey = "token"
+	TokenKey  contextKey = "token"
+	ClaimsKey contextKey = "claims"
 )
 
 type User struct {
