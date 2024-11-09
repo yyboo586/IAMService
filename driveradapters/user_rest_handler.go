@@ -29,6 +29,8 @@ func NewUserHandler() *UserHandler {
 }
 
 func (u *UserHandler) RegisterPublic(engine *gin.Engine) {
+	engine.Handle(http.MethodGet, "/api/v1/ServiceA/ready", u.ready)
+	engine.Handle(http.MethodGet, "/api/v1/ServiceA/health", u.health)
 	engine.Handle(http.MethodGet, "/api/v1/ServiceA/users/:id", u.getUserInfo)
 
 	engine.Handle(http.MethodPost, "/api/v1/ServiceA/users", u.create)
@@ -92,4 +94,12 @@ func (u *UserHandler) getUserInfo(c *gin.Context) {
 		"name": userInfo.Name,
 	}
 	rest.ReplyOK(c, http.StatusOK, data)
+}
+
+func (u *UserHandler) health(c *gin.Context) {
+	rest.ReplyOK(c, http.StatusOK, nil)
+}
+
+func (u *UserHandler) ready(c *gin.Context) {
+	rest.ReplyOK(c, http.StatusOK, nil)
 }
