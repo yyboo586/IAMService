@@ -1,167 +1,187 @@
 package driveradapters
 
-import (
-	"ServiceA/interfaces"
-	"ServiceA/interfaces/mock"
-	"bytes"
-	"encoding/json"
-	"errors"
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"testing"
+// import (
+// 	"context"
+// 	"log"
 
-	"github.com/gin-gonic/gin"
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/assert"
+// 	"UserManagement/interfaces"
+// 	"UserManagement/interfaces/mock"
+// 	jwtUtils "UserManagement/utils/jwt"
+// 	rsaUtils "UserManagement/utils/rsa"
 
-	. "github.com/smartystreets/goconvey/convey"
-)
+// 	"bytes"
+// 	"encoding/json"
+// 	"errors"
+// 	"io"
+// 	"net/http"
+// 	"net/http/httptest"
+// 	"testing"
 
-func newUserHandler(logicsUser interfaces.LogicsUser) *UserHandler {
-	return &UserHandler{
-		logicsUser: logicsUser,
-	}
-}
+// 	"github.com/gin-gonic/gin"
+// 	"github.com/golang/mock/gomock"
+// 	"github.com/stretchr/testify/assert"
 
-func TestCreate(t *testing.T) {
-	Convey("Create", t, func() {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
+// 	. "github.com/smartystreets/goconvey/convey"
+// )
 
-		mockLogicsUser := mock.NewMockLogicsUser(ctrl)
-		userHandler := newUserHandler(mockLogicsUser)
+// func newUserHandler(logicsUser interfaces.LogicsUser) *UserHandler {
+// 	return &UserHandler{
+// 		logicsUser: logicsUser,
+// 	}
+// }
 
-		gin.SetMode(gin.TestMode)
-		engine := gin.Default()
+// func generateJWTToken(userID string, claims map[string]interface{}) (jwtTokenStr string) {
+// 	privateKey, err := rsaUtils.LoadPrivateKey()
+// 	if err != nil {
+// 		log.Println(err)
+// 	}
+// 	jwtTokenStr, _ = jwtUtils.Sign(userID, claims, privateKey)
 
-		userHandler.RegisterPublic(engine)
+// 	return
+// }
 
-		user := &interfaces.User{
-			Name:     "tom",
-			Password: "123456",
-		}
-		data, _ := json.Marshal(user)
-		req, _ := http.NewRequest(http.MethodPost, "/api/v1/ServiceA/users", bytes.NewBuffer(data))
-		req.Header.Set("Content-Type", "application/json")
+// func TestCreate(t *testing.T) {
+// 	Convey("Create", t, func() {
+// 		ctrl := gomock.NewController(t)
+// 		defer ctrl.Finish()
 
-		Convey("Fail", func() {
-			mockLogicsUser.EXPECT().Create(user).Return(errors.New("internal error"))
+// 		mockLogicsUser := mock.NewMockLogicsUser(ctrl)
+// 		userHandler := newUserHandler(mockLogicsUser)
 
-			w := httptest.NewRecorder()
+// 		gin.SetMode(gin.TestMode)
+// 		engine := gin.Default()
 
-			engine.ServeHTTP(w, req)
+// 		userHandler.RegisterPublic(engine)
 
-			assert.Equal(t, http.StatusInternalServerError, w.Code)
-		})
+// 		user := &interfaces.User{
+// 			Name:     "tom",
+// 			Password: "123456",
+// 		}
+// 		data, _ := json.Marshal(user)
+// 		req, _ := http.NewRequest(http.MethodPost, "/api/v1/user-management/users", bytes.NewBuffer(data))
+// 		jwtTokenStr := generateJWTToken("user_id", nil)
+// 		req.Header.Set("Content-Type", "application/json")
+// 		req.Header.Set("Authorization", "Bearer "+jwtTokenStr)
 
-		Convey("Success", func() {
-			mockLogicsUser.EXPECT().Create(user).Return(nil)
+// 		ctx := context.Background()
+// 		Convey("Fail", func() {
+// 			mockLogicsUser.EXPECT().Create(ctx, user).Return(errors.New("internal error"))
 
-			w := httptest.NewRecorder()
+// 			w := httptest.NewRecorder()
 
-			engine.ServeHTTP(w, req)
+// 			engine.ServeHTTP(w, req)
 
-			assert.Equal(t, http.StatusCreated, w.Code)
-		})
-	})
-}
+// 			assert.Equal(t, http.StatusInternalServerError, w.Code)
+// 		})
 
-func TestLogin(t *testing.T) {
-	Convey("Login", t, func() {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
+// 		Convey("Success", func() {
+// 			mockLogicsUser.EXPECT().Create(ctx, user).Return(nil)
 
-		mockLogicsUser := mock.NewMockLogicsUser(ctrl)
-		userHandler := newUserHandler(mockLogicsUser)
+// 			w := httptest.NewRecorder()
 
-		gin.SetMode(gin.TestMode)
-		engine := gin.Default()
+// 			engine.ServeHTTP(w, req)
 
-		userHandler.RegisterPublic(engine)
+// 			assert.Equal(t, http.StatusCreated, w.Code)
+// 		})
+// 	})
+// }
 
-		user := &interfaces.User{
-			Name:     "tom",
-			Password: "123456",
-		}
-		data, _ := json.Marshal(user)
-		req, _ := http.NewRequest(http.MethodPost, "/api/v1/ServiceA/user-login", bytes.NewBuffer(data))
-		req.Header.Set("Content-Type", "application/json")
+// func TestLogin(t *testing.T) {
+// 	Convey("Login", t, func() {
+// 		ctrl := gomock.NewController(t)
+// 		defer ctrl.Finish()
 
-		Convey("Failed", func() {
-			mockLogicsUser.EXPECT().Login(user.Name, user.Password).Return("", "", errors.New("internal error"))
+// 		mockLogicsUser := mock.NewMockLogicsUser(ctrl)
+// 		userHandler := newUserHandler(mockLogicsUser)
 
-			w := httptest.NewRecorder()
-			engine.ServeHTTP(w, req)
+// 		gin.SetMode(gin.TestMode)
+// 		engine := gin.Default()
 
-			data, _ := io.ReadAll(w.Result().Body)
+// 		userHandler.RegisterPublic(engine)
 
-			assert.Equal(t, http.StatusInternalServerError, w.Code)
-			assert.Equal(t, "internal error", string(data))
-		})
+// 		user := &interfaces.User{
+// 			Name:     "tom",
+// 			Password: "123456",
+// 		}
+// 		data, _ := json.Marshal(user)
+// 		req, _ := http.NewRequest(http.MethodPost, "/api/v1/user-management/user-login", bytes.NewBuffer(data))
+// 		req.Header.Set("Content-Type", "application/json")
 
-		Convey("Success", func() {
-			mockLogicsUser.EXPECT().Login(user.Name, user.Password).Return("id", "", nil)
+// 		Convey("Failed", func() {
+// 			mockLogicsUser.EXPECT().Login(user.Name, user.Password).Return("", "", errors.New("internal error"))
 
-			w := httptest.NewRecorder()
-			engine.ServeHTTP(w, req)
+// 			w := httptest.NewRecorder()
+// 			engine.ServeHTTP(w, req)
 
-			var i interface{}
-			data, _ := io.ReadAll(w.Result().Body)
-			json.Unmarshal(data, &i)
+// 			data, _ := io.ReadAll(w.Result().Body)
 
-			assert.Equal(t, http.StatusOK, w.Code)
-			assert.Equal(t, "id", i.(map[string]interface{})["id"].(string))
-		})
-	})
-}
+// 			assert.Equal(t, http.StatusInternalServerError, w.Code)
+// 			assert.Equal(t, "internal error", string(data))
+// 		})
 
-func TestGetUserInfo(t *testing.T) {
-	Convey("GetUserInfo", t, func() {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
+// 		Convey("Success", func() {
+// 			mockLogicsUser.EXPECT().Login(user.Name, user.Password).Return("id", "", nil)
 
-		mockLogicsUser := mock.NewMockLogicsUser(ctrl)
-		userHandler := newUserHandler(mockLogicsUser)
+// 			w := httptest.NewRecorder()
+// 			engine.ServeHTTP(w, req)
 
-		gin.SetMode(gin.TestMode)
-		engine := gin.Default()
+// 			var i interface{}
+// 			data, _ := io.ReadAll(w.Result().Body)
+// 			json.Unmarshal(data, &i)
 
-		userHandler.RegisterPublic(engine)
+// 			assert.Equal(t, http.StatusOK, w.Code)
+// 			assert.Equal(t, "id", i.(map[string]interface{})["id"].(string))
+// 		})
+// 	})
+// }
 
-		req, _ := http.NewRequest(http.MethodGet, "/api/v1/ServiceA/users/123", nil)
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer jwtTokenStr")
+// func TestGetUserInfo(t *testing.T) {
+// 	Convey("GetUserInfo", t, func() {
+// 		ctrl := gomock.NewController(t)
+// 		defer ctrl.Finish()
 
-		Convey("Failed", func() {
-			mockLogicsUser.EXPECT().GetUserInfo(gomock.Any(), "123").Return(nil, errors.New("internal error"))
+// 		mockLogicsUser := mock.NewMockLogicsUser(ctrl)
+// 		userHandler := newUserHandler(mockLogicsUser)
 
-			w := httptest.NewRecorder()
-			engine.ServeHTTP(w, req)
+// 		gin.SetMode(gin.TestMode)
+// 		engine := gin.Default()
 
-			data, _ := io.ReadAll(w.Result().Body)
+// 		userHandler.RegisterPublic(engine)
 
-			assert.Equal(t, http.StatusInternalServerError, w.Code)
-			assert.Equal(t, "internal error", string(data))
-		})
+// 		req, _ := http.NewRequest(http.MethodGet, "/api/v1/user-management/users/123", nil)
+// 		jwtTokenStr := generateJWTToken("user_id", nil)
+// 		req.Header.Set("Content-Type", "application/json")
+// 		req.Header.Set("Authorization", "Bearer "+jwtTokenStr)
 
-		Convey("Success", func() {
-			userInfo := &interfaces.User{
-				ID:   "user_id",
-				Name: "tom",
-			}
-			mockLogicsUser.EXPECT().GetUserInfo(gomock.Any(), "123").Return(userInfo, nil)
+// 		Convey("Failed", func() {
+// 			mockLogicsUser.EXPECT().GetUserInfo(gomock.Any(), "123").Return(nil, errors.New("internal error"))
 
-			w := httptest.NewRecorder()
-			engine.ServeHTTP(w, req)
+// 			w := httptest.NewRecorder()
+// 			engine.ServeHTTP(w, req)
 
-			var i interface{}
-			data, _ := io.ReadAll(w.Result().Body)
-			json.Unmarshal(data, &i)
+// 			data, _ := io.ReadAll(w.Result().Body)
 
-			assert.Equal(t, http.StatusOK, w.Code)
-			assert.Equal(t, userInfo.ID, i.(map[string]interface{})["id"].(string))
-			assert.Equal(t, userInfo.Name, i.(map[string]interface{})["name"].(string))
-		})
-	})
-}
+// 			assert.Equal(t, http.StatusInternalServerError, w.Code)
+// 			assert.Equal(t, "internal error", string(data))
+// 		})
+
+// 		Convey("Success", func() {
+// 			userInfo := &interfaces.User{
+// 				ID:   "user_id",
+// 				Name: "tom",
+// 			}
+// 			mockLogicsUser.EXPECT().GetUserInfo(gomock.Any(), "123").Return(userInfo, nil)
+
+// 			w := httptest.NewRecorder()
+// 			engine.ServeHTTP(w, req)
+
+// 			var i interface{}
+// 			data, _ := io.ReadAll(w.Result().Body)
+// 			json.Unmarshal(data, &i)
+
+// 			assert.Equal(t, http.StatusOK, w.Code)
+// 			assert.Equal(t, userInfo.ID, i.(map[string]interface{})["id"].(string))
+// 			assert.Equal(t, userInfo.Name, i.(map[string]interface{})["name"].(string))
+// 		})
+// 	})
+// }

@@ -1,13 +1,18 @@
 package driveradapters
 
 import (
-	"ServiceA/interfaces"
-	"ServiceA/logics"
 	"net/http"
 	"sync"
 
+	"UserManagement/interfaces"
+	"UserManagement/logics"
+
+	"github.com/casbin/casbin/v2"
+
+	"UserManagement/utils/rest"
+	"UserManagement/utils/rest/middleware"
+
 	"github.com/gin-gonic/gin"
-	"github.com/yyboo586/utils/rest"
 )
 
 var (
@@ -17,24 +22,31 @@ var (
 
 type UserHandler struct {
 	logicsUser interfaces.LogicsUser
+	e          *casbin.Enforcer
 }
 
-func NewUserHandler() *UserHandler {
+func NewUserHandler(e *casbin.Enforcer) *UserHandler {
 	uOnce.Do(func() {
 		u = &UserHandler{
 			logicsUser: logics.NewUser(),
+			e:          e,
 		}
 	})
 	return u
 }
 
 func (u *UserHandler) RegisterPublic(engine *gin.Engine) {
-	engine.Handle(http.MethodGet, "/api/v1/ServiceA/ready", u.ready)
-	engine.Handle(http.MethodGet, "/api/v1/ServiceA/health", u.health)
-	engine.Handle(http.MethodGet, "/api/v1/ServiceA/users/:id", u.getUserInfo)
+	checkRequired := engine.Group("/", middleware.AuthRequired(), middleware.PermissionRequired(u.e))
+	{
+		checkRequired.GET("/api/v1/user-management/users/:id", u.getUserInfo)
 
-	engine.Handle(http.MethodPost, "/api/v1/ServiceA/users", u.create)
-	engine.Handle(http.MethodPost, "/api/v1/ServiceA/user-login", u.login)
+		checkRequired.POST("/api/v1/user-management/users", u.create)
+	}
+
+	engine.Handle(http.MethodGet, "/api/v1/user-management/ready", u.ready)
+	engine.Handle(http.MethodGet, "/api/v1/user-management/health", u.health)
+
+	engine.Handle(http.MethodPost, "/api/v1/user-management/user-login", u.login)
 }
 
 func (u *UserHandler) create(c *gin.Context) {
@@ -48,7 +60,7 @@ func (u *UserHandler) create(c *gin.Context) {
 	user.Name = i.(map[string]interface{})["name"].(string)
 	user.Password = i.(map[string]interface{})["password"].(string)
 
-	err = u.logicsUser.Create(user)
+	err = u.logicsUser.Create(c.Request.Context(), user)
 	if err != nil {
 		rest.ReplyError(c, err)
 		return

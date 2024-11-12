@@ -1,11 +1,12 @@
 package dbaccess
 
 import (
-	"ServiceA/interfaces"
 	"database/sql"
 	"errors"
 	"testing"
 	"time"
+
+	"UserManagement/interfaces"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	. "github.com/smartystreets/goconvey/convey"

@@ -1,12 +1,13 @@
 package dbaccess
 
 import (
-	"ServiceA/interfaces"
 	"database/sql"
 	"fmt"
 	"log"
 	"sync"
 	"time"
+
+	"UserManagement/interfaces"
 )
 
 var (

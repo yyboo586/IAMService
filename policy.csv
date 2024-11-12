@@ -1,10 +1,10 @@
 # policv.csv
-p, admin, /api/v1/ServiceA/users/:id, GET, true
-p, user,  /api/v1/ServiceA/users/:id, GET, true
-p, admin, /api/v1/ServiceA/user-login, POST, false
-p, user,  /api/v1/ServiceA/user-login, POST, false
+p, admin, /api/v1/user-management/users/:id, GET
+p, user,  /api/v1/user-management/users/:id, GET
+p, admin, /api/v1/user-management/user-login, POST
+p, user,  /api/v1/user-management/user-login, POST
 
-p, admin, /api/v1/ServiceA/users, POST, true
+p, admin, /api/v1/user-management/users, POST
 
 g, admin, admin
 g, tom, user

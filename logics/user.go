@@ -1,8 +1,6 @@
 package logics
 
 import (
-	"ServiceA/dbaccess"
-	"ServiceA/interfaces"
 	"context"
 	"crypto/rsa"
 	"net/http"
@@ -11,10 +9,14 @@ import (
 	"sync"
 	"time"
 
-	myjwt "github.com/yyboo586/utils/myJWT"
-	"github.com/yyboo586/utils/rest"
+	"UserManagement/dbaccess"
+	"UserManagement/interfaces"
 
-	"github.com/yyboo586/utils/uuid"
+	jwtUtils "UserManagement/utils/jwt"
+	"UserManagement/utils/rest"
+	errUtils "UserManagement/utils/rest/errors"
+
+	"github.com/gofrs/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -42,36 +44,30 @@ func NewUser() *user {
 	return u
 }
 
-func (u *user) Create(user *interfaces.User) (err error) {
-	user.Name = strings.Trim(user.Name, " ")
-
-	if !u.nameRegex.MatchString(user.Name) {
-		return rest.NewHTTPError(http.StatusBadRequest, "invalid name", nil)
+func (u *user) Create(ctx context.Context, userInfo *interfaces.User) (err error) {
+	if err = u.validate(userInfo); err != nil {
+		return err
 	}
 
-	if !u.pwdRegex.MatchString(user.Password) {
-		return rest.NewHTTPError(http.StatusBadRequest, "invalid password", nil)
-	}
-
-	_, exists, err := u.dbUser.FetchByName(user.Name)
+	_, exists, err := u.dbUser.FetchByName(userInfo.Name)
 	if err != nil {
-		return rest.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
+		return errUtils.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
 	}
 	if exists {
-		return rest.NewHTTPError(http.StatusConflict, "name already exists", nil)
+		return errUtils.NewHTTPError(http.StatusConflict, "name already exists", nil)
 	}
 
-	cipherText, _ := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-	user.Password = string(cipherText)
+	cipherText, _ := bcrypt.GenerateFromPassword([]byte(userInfo.Password), bcrypt.DefaultCost)
+	userInfo.Password = string(cipherText)
 
-	user.ID = uuid.NewV4().String()
+	userInfo.ID = uuid.Must(uuid.NewV4()).String()
 
-	return u.dbUser.Create(user)
+	return u.dbUser.Create(userInfo)
 }
 
 func (u *user) Login(name, passwd string) (id string, jwtTokenStr string, err error) {
 	if name == "" || passwd == "" {
-		err = rest.NewHTTPError(http.StatusBadRequest, "invalid name or password", nil)
+		err = errUtils.NewHTTPError(http.StatusBadRequest, "invalid name or password", nil)
 		return
 	}
 
@@ -86,21 +82,21 @@ func (u *user) Login(name, passwd string) (id string, jwtTokenStr string, err er
 
 	user, exists, err := u.dbUser.FetchByName(name)
 	if err != nil {
-		err = rest.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
+		err = errUtils.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
 		return
 	}
 	if !exists {
-		err = rest.NewHTTPError(http.StatusBadRequest, "invalid name or password", nil)
+		err = errUtils.NewHTTPError(http.StatusBadRequest, "invalid name or password", nil)
 		return
 	}
 
 	if err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(passwd)); err != nil {
-		err = rest.NewHTTPError(http.StatusBadRequest, "invalid name or password", nil)
+		err = errUtils.NewHTTPError(http.StatusBadRequest, "invalid name or password", nil)
 		return
 	}
 
 	if err = u.dbUser.UpdateLoginTime(user.ID); err != nil {
-		err = rest.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
+		err = errUtils.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
 		return
 	}
 
@@ -108,8 +104,8 @@ func (u *user) Login(name, passwd string) (id string, jwtTokenStr string, err er
 		"id":   user.ID,
 		"name": user.Name,
 	}
-	if jwtTokenStr, err = myjwt.Sign(user.ID, claims, u.privateKey); err != nil {
-		err = rest.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
+	if jwtTokenStr, err = jwtUtils.Sign(user.ID, claims, u.privateKey); err != nil {
+		err = errUtils.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
 		return
 	}
 
@@ -118,17 +114,36 @@ func (u *user) Login(name, passwd string) (id string, jwtTokenStr string, err er
 
 func (u *user) GetUserInfo(ctx context.Context, id string) (userInfo *interfaces.User, err error) {
 	// log.Printf("DEBUG: ExtClaims: %v, jwtToken: %v\n", ctx.Value(interfaces.ClaimsKey).(map[string]interface{}), ctx.Value(interfaces.TokenKey).(string))
+	// 只能获取自己的数据
+	if id != ctx.Value(rest.ClaimsKey).(map[string]interface{})["id"].(string) {
+		err = errUtils.NewHTTPError(http.StatusForbidden, "no permission", nil)
+		return
+	}
 
 	var exists bool
 	userInfo, exists, err = u.dbUser.GetUserInfoByID(id)
 	if err != nil {
-		err = rest.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
+		err = errUtils.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
 		return
 	}
 	if !exists {
-		err = rest.NewHTTPError(http.StatusNotFound, "user not found", nil)
+		err = errUtils.NewHTTPError(http.StatusNotFound, "user not found", nil)
 		return
 	}
 
 	return
+}
+
+func (u *user) validate(userInfo *interfaces.User) error {
+	userInfo.Name = strings.Trim(userInfo.Name, " ")
+
+	if !u.nameRegex.MatchString(userInfo.Name) {
+		return errUtils.NewHTTPError(http.StatusBadRequest, "invalid name", nil)
+	}
+
+	if !u.pwdRegex.MatchString(userInfo.Password) {
+		return errUtils.NewHTTPError(http.StatusBadRequest, "invalid password", nil)
+	}
+
+	return nil
 }
