@@ -24,7 +24,9 @@ var (
 
 func init() {
 	privateKey, err = rsaUtils.LoadPrivateKey()
-	log.Println(err)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func AuthRequired() gin.HandlerFunc {

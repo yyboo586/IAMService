@@ -1,13 +1,31 @@
 package interfaces
 
-import "context"
+import (
+	"context"
+	"sync"
+)
 
 //go:generate mockgen -source=./logics.go -destination=mock/logics_mock.go -package=mock
 
 type User struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Password string `json:"password"`
+	ID       string
+	Name     string
+	Password string
+	Email    string
+}
+
+var free = sync.Pool{
+	New: func() any {
+		return &User{}
+	},
+}
+
+func NewUser() *User {
+	return free.Get().(*User)
+}
+
+func FreeUser(user *User) {
+	free.Put(user)
 }
 
 type LogicsUser interface {

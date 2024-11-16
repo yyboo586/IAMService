@@ -49,8 +49,10 @@ func main() {
 	logics.SetPrivateKey(privateKey)
 	logics.SetDBPool(dbPool)
 
+	driveradapters.SetEnforcer(e)
+
 	s := &Server{
-		userHandler: driveradapters.NewUserHandler(e),
+		userHandler: driveradapters.NewUserHandler(),
 	}
 
 	s.Start()

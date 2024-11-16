@@ -8,6 +8,7 @@ import (
 	"UserManagement/logics"
 
 	"github.com/casbin/casbin/v2"
+	"github.com/xeipuuv/gojsonschema"
 
 	"UserManagement/utils/rest"
 	"UserManagement/utils/rest/middleware"
@@ -21,15 +22,27 @@ var (
 )
 
 type UserHandler struct {
-	logicsUser interfaces.LogicsUser
-	e          *casbin.Enforcer
+	logicsUser       interfaces.LogicsUser
+	e                *casbin.Enforcer
+	userCreateSchema *gojsonschema.Schema
+	userLoginSchema  *gojsonschema.Schema
 }
 
-func NewUserHandler(e *casbin.Enforcer) *UserHandler {
+func NewUserHandler() *UserHandler {
 	uOnce.Do(func() {
+		userCreateSchema, err := gojsonschema.NewSchema(gojsonschema.NewStringLoader(userCreateString))
+		if err != nil {
+			panic(err)
+		}
+		userLoginSchema, err := gojsonschema.NewSchema(gojsonschema.NewStringLoader(userLoginString))
+		if err != nil {
+			panic(err)
+		}
 		u = &UserHandler{
-			logicsUser: logics.NewUser(),
-			e:          e,
+			logicsUser:       logics.NewUser(),
+			e:                enforcer,
+			userCreateSchema: userCreateSchema,
+			userLoginSchema:  userLoginSchema,
 		}
 	})
 	return u
@@ -50,17 +63,19 @@ func (u *UserHandler) RegisterPublic(engine *gin.Engine) {
 }
 
 func (u *UserHandler) create(c *gin.Context) {
-	i, err := validate(c)
+	userInfo := interfaces.NewUser()
+	defer interfaces.FreeUser(userInfo)
+
+	body, err := Validate(c, u.userCreateSchema)
 	if err != nil {
 		rest.ReplyError(c, err)
 		return
 	}
 
-	user := &interfaces.User{}
-	user.Name = i.(map[string]interface{})["name"].(string)
-	user.Password = i.(map[string]interface{})["password"].(string)
+	userInfo.Name = body.(map[string]interface{})["name"].(string)
+	userInfo.Password = body.(map[string]interface{})["password"].(string)
 
-	err = u.logicsUser.Create(c.Request.Context(), user)
+	err = u.logicsUser.Create(c.Request.Context(), userInfo)
 	if err != nil {
 		rest.ReplyError(c, err)
 		return
@@ -70,14 +85,14 @@ func (u *UserHandler) create(c *gin.Context) {
 }
 
 func (u *UserHandler) login(c *gin.Context) {
-	i, err := validate(c)
+	body, err := Validate(c, u.userLoginSchema)
 	if err != nil {
 		rest.ReplyError(c, err)
 		return
 	}
 
-	name := i.(map[string]interface{})["name"].(string)
-	password := i.(map[string]interface{})["password"].(string)
+	name := body.(map[string]interface{})["name"].(string)
+	password := body.(map[string]interface{})["password"].(string)
 
 	id, jwtTokenStr, err := u.logicsUser.Login(name, password)
 	if err != nil {
