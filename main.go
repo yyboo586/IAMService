@@ -10,6 +10,7 @@ import (
 	"github.com/casbin/casbin/v2"
 	"github.com/go-mail/mail/v2"
 
+	configUtils "UserManagement/utils/config"
 	dbUtils "UserManagement/utils/db"
 	rsaUtils "UserManagement/utils/rsa"
 
@@ -18,6 +19,7 @@ import (
 
 type Server struct {
 	userHandler interfaces.RESTHandler
+	config      *configUtils.Config
 }
 
 func (s *Server) Start() {
@@ -26,19 +28,21 @@ func (s *Server) Start() {
 
 		s.userHandler.RegisterPublic(engine)
 
-		if err := engine.Run(":10001"); err != nil {
+		if err := engine.Run(s.config.Server.Addr); err != nil {
 			panic(err)
 		}
 	}()
 }
 
 func main() {
-	dbPool, err := dbUtils.NewDB("root", "12345678", "localhost", 3306, "ServiceA")
+	config := configUtils.Default()
+
+	dbPool, err := dbUtils.NewDB(config.DB.User, config.DB.Pass, config.DB.Host, config.DB.Port, config.DB.DBName)
 	if err != nil {
 		panic(err)
 	}
 
-	mailDialer := mail.NewDialer("sandbox.smtp.mailtrap.io", 25, "8df5de08b5f13f", "fcb5034938135d")
+	mailDialer := mail.NewDialer(config.Mailer.Host, config.Mailer.Port, config.Mailer.User, config.Mailer.Pass)
 
 	privateKey, _ := rsaUtils.LoadPrivateKey()
 
@@ -59,6 +63,7 @@ func main() {
 
 	s := &Server{
 		userHandler: driveradapters.NewUserHandler(),
+		config:      config,
 	}
 
 	s.Start()
