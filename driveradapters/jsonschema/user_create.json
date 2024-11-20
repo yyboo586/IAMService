@@ -7,6 +7,9 @@
         },
         "password": {
             "type": "string"
+        },
+        "email": {
+            "type": "string"
         }
     },
     "additionalProperties": false

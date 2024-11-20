@@ -74,6 +74,9 @@ func (u *UserHandler) create(c *gin.Context) {
 
 	userInfo.Name = body.(map[string]interface{})["name"].(string)
 	userInfo.Password = body.(map[string]interface{})["password"].(string)
+	if email, ok := body.(map[string]interface{})["email"]; ok {
+		userInfo.Email = email.(string)
+	}
 
 	err = u.logicsUser.Create(c.Request.Context(), userInfo)
 	if err != nil {

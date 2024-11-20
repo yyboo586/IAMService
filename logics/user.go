@@ -3,6 +3,7 @@ package logics
 import (
 	"context"
 	"crypto/rsa"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -29,6 +30,7 @@ type user struct {
 	pwdRegex   *regexp.Regexp
 	nameRegex  *regexp.Regexp
 	privateKey *rsa.PrivateKey
+	mailer     interfaces.LogicsMailer
 	dbUser     interfaces.DBUser
 }
 
@@ -38,6 +40,7 @@ func NewUser() *user {
 			pwdRegex:   regexp.MustCompile(`^[a-zA-Z0-9]{6,12}$`),
 			nameRegex:  regexp.MustCompile(`^[\p{Han}a-zA-Z0-9]{1,10}$`),
 			privateKey: privateKey,
+			mailer:     NewLogicsMailer(),
 			dbUser:     dbaccess.NewUser(),
 		}
 	})
@@ -62,7 +65,28 @@ func (u *user) Create(ctx context.Context, userInfo *interfaces.User) (err error
 
 	userInfo.ID = uuid.Must(uuid.NewV4()).String()
 
-	return u.dbUser.Create(userInfo)
+	err = u.dbUser.Create(userInfo)
+	if err != nil {
+		return errUtils.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
+	}
+
+	// 不保证可以发送成功
+	if userInfo.Email != "" {
+		go func() {
+			msg := &interfaces.MailMessage{
+				ID: userInfo.ID,
+				To: userInfo.Email,
+			}
+
+			if err = u.mailer.SendMail(ctx, interfaces.UserWelcome, msg); err != nil {
+				log.Println("failed to send email", err)
+			} else {
+				log.Println("send email successfully")
+			}
+		}()
+	}
+
+	return nil
 }
 
 func (u *user) Login(name, passwd string) (id string, jwtTokenStr string, err error) {

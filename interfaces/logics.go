@@ -37,6 +37,17 @@ type LogicsUser interface {
 	GetUserInfo(ctx context.Context, id string) (*User, error)
 }
 
-type LogicsCasbin interface {
-	PermissionCheck(ctx context.Context) (bool, error)
+type MailOp string
+
+const (
+	UserWelcome MailOp = "user_welcome"
+)
+
+type MailMessage struct {
+	ID string `json:"id"`
+	To string
+}
+
+type LogicsMailer interface {
+	SendMail(ctx context.Context, op MailOp, msg *MailMessage) error
 }

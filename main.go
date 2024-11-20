@@ -2,11 +2,13 @@ package main
 
 import (
 	"UserManagement/dbaccess"
+	"UserManagement/drivenadapters"
 	"UserManagement/driveradapters"
 	"UserManagement/interfaces"
 	"UserManagement/logics"
 
 	"github.com/casbin/casbin/v2"
+	"github.com/go-mail/mail/v2"
 
 	dbUtils "UserManagement/utils/db"
 	rsaUtils "UserManagement/utils/rsa"
@@ -36,6 +38,8 @@ func main() {
 		panic(err)
 	}
 
+	mailDialer := mail.NewDialer("sandbox.smtp.mailtrap.io", 25, "8df5de08b5f13f", "fcb5034938135d")
+
 	privateKey, _ := rsaUtils.LoadPrivateKey()
 
 	e, err := casbin.NewEnforcer("model.conf", "policy.csv")
@@ -45,6 +49,8 @@ func main() {
 
 	// 依赖注入
 	dbaccess.SetDBPool(dbPool)
+
+	drivenadapters.SetMailDialer(mailDialer)
 
 	logics.SetPrivateKey(privateKey)
 	logics.SetDBPool(dbPool)
