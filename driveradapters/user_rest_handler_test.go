@@ -4,10 +4,10 @@ package driveradapters
 // 	"context"
 // 	"log"
 
-// 	"UserManagement/interfaces"
-// 	"UserManagement/interfaces/mock"
-// 	jwtUtils "UserManagement/utils/jwt"
-// 	rsaUtils "UserManagement/utils/rsa"
+// 	"github.com/yyboo586/IAMService/interfaces"
+// 	"github.com/yyboo586/IAMService/interfaces/mock"
+// 	jwtUtils "github.com/yyboo586/IAMService/utils/jwt"
+// 	rsaUtils "github.com/yyboo586/IAMService/utils/rsa"
 
 // 	"bytes"
 // 	"encoding/json"
@@ -58,7 +58,7 @@ package driveradapters
 // 			Password: "123456",
 // 		}
 // 		data, _ := json.Marshal(user)
-// 		req, _ := http.NewRequest(http.MethodPost, "/api/v1/user-management/users", bytes.NewBuffer(data))
+// 		req, _ := http.NewRequest(http.MethodPost, "/api/v1/IAMService/users", bytes.NewBuffer(data))
 // 		jwtTokenStr := generateJWTToken("user_id", nil)
 // 		req.Header.Set("Content-Type", "application/json")
 // 		req.Header.Set("Authorization", "Bearer "+jwtTokenStr)
@@ -104,7 +104,7 @@ package driveradapters
 // 			Password: "123456",
 // 		}
 // 		data, _ := json.Marshal(user)
-// 		req, _ := http.NewRequest(http.MethodPost, "/api/v1/user-management/user-login", bytes.NewBuffer(data))
+// 		req, _ := http.NewRequest(http.MethodPost, "/api/v1/IAMService/user-login", bytes.NewBuffer(data))
 // 		req.Header.Set("Content-Type", "application/json")
 
 // 		Convey("Failed", func() {
@@ -148,7 +148,7 @@ package driveradapters
 
 // 		userHandler.RegisterPublic(engine)
 
-// 		req, _ := http.NewRequest(http.MethodGet, "/api/v1/user-management/users/123", nil)
+// 		req, _ := http.NewRequest(http.MethodGet, "/api/v1/IAMService/users/123", nil)
 // 		jwtTokenStr := generateJWTToken("user_id", nil)
 // 		req.Header.Set("Content-Type", "application/json")
 // 		req.Header.Set("Authorization", "Bearer "+jwtTokenStr)

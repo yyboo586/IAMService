@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	gomail "github.com/go-mail/mail/v2"
+	"github.com/yyboo586/common/logUtils"
 )
 
 var (
@@ -14,12 +15,14 @@ var (
 
 type mailer struct {
 	dialer *gomail.Dialer
+	logger *logUtils.Logger
 }
 
 func NewMailer() *mailer {
 	mOnce.Do(func() {
 		m = &mailer{
 			dialer: mailDialer,
+			logger: loggerInstance,
 		}
 	})
 

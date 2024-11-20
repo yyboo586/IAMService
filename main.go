@@ -1,18 +1,19 @@
 package main
 
 import (
-	"UserManagement/dbaccess"
-	"UserManagement/drivenadapters"
-	"UserManagement/driveradapters"
-	"UserManagement/interfaces"
-	"UserManagement/logics"
+	"github.com/yyboo586/IAMService/dbaccess"
+	"github.com/yyboo586/IAMService/drivenadapters"
+	"github.com/yyboo586/IAMService/driveradapters"
+	"github.com/yyboo586/IAMService/interfaces"
+	"github.com/yyboo586/IAMService/logics"
 
 	"github.com/casbin/casbin/v2"
 	"github.com/go-mail/mail/v2"
 
-	configUtils "UserManagement/utils/config"
-	dbUtils "UserManagement/utils/db"
-	rsaUtils "UserManagement/utils/rsa"
+	configUtils "github.com/yyboo586/IAMService/utils/config"
+
+	"github.com/yyboo586/common/dbUtils"
+	"github.com/yyboo586/common/logUtils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -37,29 +38,33 @@ func (s *Server) Start() {
 func main() {
 	config := configUtils.Default()
 
-	dbPool, err := dbUtils.NewDB(config.DB.User, config.DB.Pass, config.DB.Host, config.DB.Port, config.DB.DBName)
+	dbPool, err := dbUtils.NewDB(&config.DBConfig)
 	if err != nil {
 		panic(err)
 	}
 
 	mailDialer := mail.NewDialer(config.Mailer.Host, config.Mailer.Port, config.Mailer.User, config.Mailer.Pass)
 
-	privateKey, _ := rsaUtils.LoadPrivateKey()
-
 	e, err := casbin.NewEnforcer("model.conf", "policy.csv")
+	if err != nil {
+		panic(err)
+	}
+
+	logger, err := logUtils.NewLogger(config.Logger.Level)
 	if err != nil {
 		panic(err)
 	}
 
 	// 依赖注入
 	dbaccess.SetDBPool(dbPool)
+	dbaccess.SetLogger(logger)
 
 	drivenadapters.SetMailDialer(mailDialer)
 
-	logics.SetPrivateKey(privateKey)
-	logics.SetDBPool(dbPool)
+	logics.SetLogger(logger)
 
 	driveradapters.SetEnforcer(e)
+	driveradapters.SetLogger(logger)
 
 	s := &Server{
 		userHandler: driveradapters.NewUserHandler(),

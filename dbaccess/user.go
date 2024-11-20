@@ -3,11 +3,11 @@ package dbaccess
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
-	"UserManagement/interfaces"
+	"github.com/yyboo586/IAMService/interfaces"
+	"github.com/yyboo586/common/logUtils"
 )
 
 var (
@@ -16,13 +16,15 @@ var (
 )
 
 type user struct {
-	db *sql.DB
+	db     *sql.DB
+	logger *logUtils.Logger
 }
 
 func NewUser() *user {
 	uOnce.Do(func() {
 		u = &user{
-			db: db,
+			db:     dbPool,
+			logger: loggerInstance,
 		}
 	})
 
@@ -30,15 +32,13 @@ func NewUser() *user {
 }
 
 func (u *user) Create(user *interfaces.User) (err error) {
-	return u.withTransaction(func(tx *sql.Tx) error {
-		sqlStr := "insert into t_user (id, name, password) values(?, ?, ?)"
+	sqlStr := "insert into t_user (id, name, password) values(?, ?, ?)"
 
-		if _, err := tx.Exec(sqlStr, user.ID, user.Name, user.Password); err != nil {
-			return fmt.Errorf("create user error: %v", err)
-		}
+	if _, err := u.db.Exec(sqlStr, user.ID, user.Name, user.Password); err != nil {
+		return fmt.Errorf("create user error: %v", err)
+	}
 
-		return nil
-	})
+	return nil
 }
 
 func (u *user) GetUserInfoByID(id string) (user *interfaces.User, exists bool, err error) {
@@ -75,27 +75,4 @@ func (u *user) UpdateLoginTime(id string) (err error) {
 	_, err = u.db.Exec(sqlStr, time.Unix(time.Now().Unix(), 0).Format("2006-01-02 15:04:05"), id)
 
 	return
-}
-
-func (u *user) withTransaction(fn func(tx *sql.Tx) error) error {
-	tx, err := u.db.Begin()
-	if err != nil {
-		return fmt.Errorf("transaction start error: %v", err.Error())
-	}
-
-	defer func() {
-		if err != nil {
-			if rErr := tx.Rollback(); rErr != nil {
-				log.Printf("transaction rollback error: %v\n", rErr)
-			}
-			return
-		}
-
-		if tErr := tx.Commit(); tErr != nil {
-			log.Printf("transaction commit error: %v\n", tErr.Error())
-			err = tErr
-		}
-	}()
-
-	return fn(tx)
 }

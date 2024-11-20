@@ -1,14 +1,10 @@
 package config
 
+import "github.com/yyboo586/common/dbUtils"
+
 type Config struct {
-	DB struct {
-		Host   string
-		Port   int
-		User   string
-		Pass   string
-		DBName string
-	}
-	Mailer struct {
+	DBConfig dbUtils.Config
+	Mailer   struct {
 		Host string
 		Port int
 		User string
@@ -17,6 +13,9 @@ type Config struct {
 	Server struct {
 		Addr string
 	}
+	Logger struct {
+		Level string
+	}
 }
 
 func Default() *Config {
@@ -24,18 +23,12 @@ func Default() *Config {
 }
 
 var defaultConfig = Config{
-	DB: struct {
-		Host   string
-		Port   int
-		User   string
-		Pass   string
-		DBName string
-	}{
+	DBConfig: dbUtils.Config{
+		User:   "root",
+		Passwd: "12345678",
 		Host:   "127.0.0.1",
 		Port:   3306,
-		User:   "root",
-		Pass:   "12345678",
-		DBName: "ServiceA",
+		DBName: "IAMService",
 	},
 	Mailer: struct {
 		Host string
@@ -52,5 +45,10 @@ var defaultConfig = Config{
 		Addr string
 	}{
 		Addr: "0.0.0.0:10001",
+	},
+	Logger: struct {
+		Level string
+	}{
+		Level: "debug",
 	},
 }

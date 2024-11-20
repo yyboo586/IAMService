@@ -51,3 +51,8 @@ type MailMessage struct {
 type LogicsMailer interface {
 	SendMail(ctx context.Context, op MailOp, msg *MailMessage) error
 }
+
+type LogicsJWT interface {
+	Sign(userID string, claims map[string]interface{}, setID, alg string) (string, error)
+	Verify(jwtTokenStr string) (map[string]interface{}, error)
+}

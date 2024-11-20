@@ -2,18 +2,19 @@ package logics
 
 import (
 	"crypto/rsa"
-	"database/sql"
+
+	"github.com/yyboo586/common/logUtils"
 )
 
 var (
-	privateKey *rsa.PrivateKey
-	dbPool     *sql.DB
+	privateKey     *rsa.PrivateKey
+	loggerInstance *logUtils.Logger
 )
 
 func SetPrivateKey(key *rsa.PrivateKey) {
 	privateKey = key
 }
 
-func SetDBPool(i *sql.DB) {
-	dbPool = i
+func SetLogger(i *logUtils.Logger) {
+	loggerInstance = i
 }

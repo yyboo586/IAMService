@@ -1,14 +1,15 @@
 package logics
 
 import (
-	"UserManagement/drivenadapters"
-	"UserManagement/interfaces"
 	"bytes"
 	"context"
 	"embed"
 	"errors"
 	"html/template"
 	"sync"
+
+	"github.com/yyboo586/IAMService/drivenadapters"
+	"github.com/yyboo586/IAMService/interfaces"
 )
 
 var (

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"UserManagement/utils/rest/errors"
+	"github.com/yyboo586/IAMService/utils/rest/errors"
 
 	"github.com/gin-gonic/gin"
 )

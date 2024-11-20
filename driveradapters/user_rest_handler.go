@@ -4,14 +4,15 @@ import (
 	"net/http"
 	"sync"
 
-	"UserManagement/interfaces"
-	"UserManagement/logics"
+	"github.com/yyboo586/IAMService/interfaces"
+	"github.com/yyboo586/IAMService/logics"
+	"github.com/yyboo586/common/logUtils"
 
 	"github.com/casbin/casbin/v2"
 	"github.com/xeipuuv/gojsonschema"
 
-	"UserManagement/utils/rest"
-	"UserManagement/utils/rest/middleware"
+	"github.com/yyboo586/IAMService/utils/rest"
+	"github.com/yyboo586/IAMService/utils/rest/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,7 +24,9 @@ var (
 
 type UserHandler struct {
 	logicsUser       interfaces.LogicsUser
+	logicsJWT        interfaces.LogicsJWT
 	e                *casbin.Enforcer
+	logger           *logUtils.Logger
 	userCreateSchema *gojsonschema.Schema
 	userLoginSchema  *gojsonschema.Schema
 }
@@ -40,7 +43,9 @@ func NewUserHandler() *UserHandler {
 		}
 		u = &UserHandler{
 			logicsUser:       logics.NewUser(),
+			logicsJWT:        logics.NewLogicsJWT(),
 			e:                enforcer,
+			logger:           loggerInstance,
 			userCreateSchema: userCreateSchema,
 			userLoginSchema:  userLoginSchema,
 		}
@@ -49,17 +54,17 @@ func NewUserHandler() *UserHandler {
 }
 
 func (u *UserHandler) RegisterPublic(engine *gin.Engine) {
-	checkRequired := engine.Group("/", middleware.AuthRequired(), middleware.PermissionRequired(u.e))
+	checkRequired := engine.Group("/", middleware.AuthRequired(u.logicsJWT), middleware.PermissionRequired(u.e))
 	{
-		checkRequired.GET("/api/v1/user-management/users/:id", u.getUserInfo)
+		checkRequired.GET("/api/v1/IAMService/users/:id", u.getUserInfo)
 
-		checkRequired.POST("/api/v1/user-management/users", u.create)
+		checkRequired.POST("/api/v1/IAMService/users", u.create)
 	}
 
-	engine.Handle(http.MethodGet, "/api/v1/user-management/ready", u.ready)
-	engine.Handle(http.MethodGet, "/api/v1/user-management/health", u.health)
+	engine.Handle(http.MethodGet, "/api/v1/IAMService/ready", u.ready)
+	engine.Handle(http.MethodGet, "/api/v1/IAMService/health", u.health)
 
-	engine.Handle(http.MethodPost, "/api/v1/user-management/user-login", u.login)
+	engine.Handle(http.MethodPost, "/api/v1/IAMService/user-login", u.login)
 }
 
 func (u *UserHandler) create(c *gin.Context) {

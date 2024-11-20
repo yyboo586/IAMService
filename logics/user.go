@@ -3,19 +3,17 @@ package logics
 import (
 	"context"
 	"crypto/rsa"
-	"log"
 	"net/http"
 	"regexp"
 	"strings"
 	"sync"
-	"time"
 
-	"UserManagement/dbaccess"
-	"UserManagement/interfaces"
+	"github.com/yyboo586/IAMService/dbaccess"
+	"github.com/yyboo586/IAMService/interfaces"
+	"github.com/yyboo586/common/logUtils"
 
-	jwtUtils "UserManagement/utils/jwt"
-	"UserManagement/utils/rest"
-	errUtils "UserManagement/utils/rest/errors"
+	"github.com/yyboo586/IAMService/utils/rest"
+	errUtils "github.com/yyboo586/IAMService/utils/rest/errors"
 
 	"github.com/gofrs/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -30,7 +28,9 @@ type user struct {
 	pwdRegex   *regexp.Regexp
 	nameRegex  *regexp.Regexp
 	privateKey *rsa.PrivateKey
+	logger     *logUtils.Logger
 	mailer     interfaces.LogicsMailer
+	loJWT      interfaces.LogicsJWT
 	dbUser     interfaces.DBUser
 }
 
@@ -40,7 +40,9 @@ func NewUser() *user {
 			pwdRegex:   regexp.MustCompile(`^[a-zA-Z0-9]{6,12}$`),
 			nameRegex:  regexp.MustCompile(`^[\p{Han}a-zA-Z0-9]{1,10}$`),
 			privateKey: privateKey,
+			logger:     loggerInstance,
 			mailer:     NewLogicsMailer(),
+			loJWT:      NewLogicsJWT(),
 			dbUser:     dbaccess.NewUser(),
 		}
 	})
@@ -79,9 +81,9 @@ func (u *user) Create(ctx context.Context, userInfo *interfaces.User) (err error
 			}
 
 			if err = u.mailer.SendMail(ctx, interfaces.UserWelcome, msg); err != nil {
-				log.Println("failed to send email", err)
+				u.logger.Errorf("failed to send email: %v", err)
 			} else {
-				log.Println("send email successfully")
+				u.logger.Infof("send email successfully")
 			}
 		}()
 	}
@@ -100,9 +102,9 @@ func (u *user) Login(name, passwd string) (id string, jwtTokenStr string, err er
 	// - 当用户名不存在或密码错误时，返回的错误信息相同，这有助于防止攻击者通过响应时间来判断用户名是否存在。
 	// - 但是，bcrypt.CompareHashAndPassword 的执行时间是固定的，而 FetchByName 和 UpdateLoginTime 的执行时间可能因数据库状态而异。
 	// - 为了进一步提高安全性，可以在密码验证之前引入一个固定时间的延迟，以确保所有路径的执行时间大致相同。
-	defer func() {
-		time.Sleep(100 * time.Millisecond)
-	}()
+	// defer func() {
+	// 	time.Sleep(100 * time.Millisecond)
+	// }()
 
 	user, exists, err := u.dbUser.FetchByName(name)
 	if err != nil {
@@ -128,7 +130,7 @@ func (u *user) Login(name, passwd string) (id string, jwtTokenStr string, err er
 		"id":   user.ID,
 		"name": user.Name,
 	}
-	if jwtTokenStr, err = jwtUtils.Sign(user.ID, claims, u.privateKey); err != nil {
+	if jwtTokenStr, err = u.loJWT.Sign(user.ID, claims, "id_token", "HS256"); err != nil {
 		err = errUtils.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
 		return
 	}

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"UserManagement/interfaces"
+	"github.com/yyboo586/IAMService/interfaces"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	. "github.com/smartystreets/goconvey/convey"

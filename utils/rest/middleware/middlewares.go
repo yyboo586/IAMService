@@ -2,34 +2,20 @@ package middleware
 
 import (
 	"context"
-	"crypto/rsa"
 	"log"
 	"net/http"
 	"strings"
 
-	jwtUtils "UserManagement/utils/jwt"
-	"UserManagement/utils/rest"
-	errUtils "UserManagement/utils/rest/errors"
-	rsaUtils "UserManagement/utils/rsa"
+	"github.com/yyboo586/IAMService/interfaces"
+	"github.com/yyboo586/IAMService/utils/rest"
+	errUtils "github.com/yyboo586/IAMService/utils/rest/errors"
 
 	"github.com/casbin/casbin/v2"
 
 	"github.com/gin-gonic/gin"
 )
 
-var (
-	err        error
-	privateKey *rsa.PrivateKey
-)
-
-func init() {
-	privateKey, err = rsaUtils.LoadPrivateKey()
-	if err != nil {
-		panic(err)
-	}
-}
-
-func AuthRequired() gin.HandlerFunc {
+func AuthRequired(loJWT interfaces.LogicsJWT) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenInfos := strings.Split(c.GetHeader("Authorization"), " ")
 		if len(tokenInfos) < 2 {
@@ -38,7 +24,7 @@ func AuthRequired() gin.HandlerFunc {
 			return
 		}
 
-		extClaims, err := jwtUtils.Verify(tokenInfos[1], privateKey)
+		extClaims, err := loJWT.Verify(tokenInfos[1])
 		if err != nil {
 			rest.ReplyError(c, errUtils.NewHTTPError(http.StatusUnauthorized, "token is invalid", nil))
 			c.Abort()
