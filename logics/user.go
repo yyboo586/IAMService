@@ -130,7 +130,7 @@ func (u *user) Login(name, passwd string) (id string, jwtTokenStr string, err er
 		"id":   user.ID,
 		"name": user.Name,
 	}
-	if jwtTokenStr, err = u.loJWT.Sign(user.ID, claims, "id_token", "HS256"); err != nil {
+	if jwtTokenStr, err = u.loJWT.Sign(user.ID, claims, "ac_token", "RS256"); err != nil {
 		err = errUtils.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
 		return
 	}

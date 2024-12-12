@@ -20,6 +20,7 @@ import (
 
 type Server struct {
 	userHandler interfaces.RESTHandler
+	oidcHandler interfaces.RESTHandler
 	config      *configUtils.Config
 }
 
@@ -28,6 +29,7 @@ func (s *Server) Start() {
 		engine := gin.Default()
 
 		s.userHandler.RegisterPublic(engine)
+		s.oidcHandler.RegisterPublic(engine)
 
 		if err := engine.Run(s.config.Server.Addr); err != nil {
 			panic(err)
@@ -68,6 +70,7 @@ func main() {
 
 	s := &Server{
 		userHandler: driveradapters.NewUserHandler(),
+		oidcHandler: driveradapters.NewOIDCHandler(),
 		config:      config,
 	}
 

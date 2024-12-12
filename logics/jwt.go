@@ -1,6 +1,8 @@
 package logics
 
 import (
+	"crypto/ecdsa"
+	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
@@ -240,4 +242,35 @@ func (j *logicsJWT) getKey(kid string) (key *jose.JSONWebKey, err error) {
 	}
 
 	return key, nil
+}
+
+func (j *logicsJWT) GetPublicKey(kid string) (*jose.JSONWebKey, error) {
+	key, err := j.getKey(kid)
+	if err != nil {
+		j.logger.Error(err)
+		return nil, err
+	}
+
+	k, err := getPublic(key)
+	if err != nil {
+		j.logger.Error(err)
+		return nil, err
+	}
+
+	return &k, nil
+}
+
+func getPublic(k *jose.JSONWebKey) (jose.JSONWebKey, error) {
+	ret := *k
+	switch key := k.Key.(type) {
+	case *ecdsa.PrivateKey:
+		ret.Key = key.Public()
+	case *rsa.PrivateKey:
+		ret.Key = key.Public()
+		return ret, nil
+	default:
+		return jose.JSONWebKey{}, fmt.Errorf("unsupported key type")
+	}
+
+	return ret, nil
 }

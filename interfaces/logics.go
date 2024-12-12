@@ -3,6 +3,8 @@ package interfaces
 import (
 	"context"
 	"sync"
+
+	"github.com/go-jose/go-jose/v4"
 )
 
 //go:generate mockgen -source=./logics.go -destination=mock/logics_mock.go -package=mock
@@ -55,4 +57,5 @@ type LogicsMailer interface {
 type LogicsJWT interface {
 	Sign(userID string, claims map[string]interface{}, setID, alg string) (string, error)
 	Verify(jwtTokenStr string) (map[string]interface{}, error)
+	GetPublicKey(kid string) (key *jose.JSONWebKey, err error)
 }
