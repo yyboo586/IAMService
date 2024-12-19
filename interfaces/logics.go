@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 )
 
 //go:generate mockgen -source=./logics.go -destination=mock/logics_mock.go -package=mock
@@ -54,8 +55,16 @@ type LogicsMailer interface {
 	SendMail(ctx context.Context, op MailOp, msg *MailMessage) error
 }
 
+type CustomClaims struct {
+	jwt.Claims
+
+	ExtClaims map[string]interface{}
+}
+
 type LogicsJWT interface {
 	Sign(userID string, claims map[string]interface{}, setID, alg string) (string, error)
-	Verify(jwtTokenStr string) (map[string]interface{}, error)
+	Verify(jwtTokenStr string) (*CustomClaims, error)
 	GetPublicKey(kid string) (key *jose.JSONWebKey, err error)
+
+	RevokeToken(jwtTokenStr string) error
 }

@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/yyboo586/IAMService/dbaccess"
 	"github.com/yyboo586/IAMService/interfaces"
+	"github.com/yyboo586/IAMService/utils/rest/errors"
 	"github.com/yyboo586/common/jwtUtils"
 	"github.com/yyboo586/common/logUtils"
 )
@@ -24,12 +26,6 @@ var (
 	logicsJWTOnce sync.Once
 	lJWT          interfaces.LogicsJWT
 )
-
-type CustomClaims struct {
-	jwt.Claims
-
-	ExtClaims map[string]interface{}
-}
 
 type logicsJWT struct {
 	dbJWT interfaces.DBJWT
@@ -69,16 +65,17 @@ func (j *logicsJWT) Sign(userID string, claims map[string]interface{}, setID, al
 		claims = make(map[string]interface{})
 	}
 
-	cclaims := CustomClaims{
-		jwt.Claims{
+	cclaims := interfaces.CustomClaims{
+		Claims: jwt.Claims{
 			Issuer:    "IAMService.com",
 			Subject:   userID,
 			Audience:  []string{"IAMService"},
 			Expiry:    jwt.NewNumericDate(time.Now().Add(time.Hour * 1)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
+			ID:        uuid.Must(uuid.NewV4()).String(),
 		},
-		claims,
+		ExtClaims: claims,
 	}
 	jwtTokenStr, err = jwt.Signed(signer).Claims(cclaims).Serialize()
 	if err != nil {
@@ -89,7 +86,7 @@ func (j *logicsJWT) Sign(userID string, claims map[string]interface{}, setID, al
 	return jwtTokenStr, nil
 }
 
-func (j *logicsJWT) Verify(jwtTokenStr string) (extClaims map[string]interface{}, err error) {
+func (j *logicsJWT) Verify(jwtTokenStr string) (claims *interfaces.CustomClaims, err error) {
 	kid, err := getKid(jwtTokenStr)
 	if err != nil {
 		j.logger.Error(err)
@@ -104,31 +101,59 @@ func (j *logicsJWT) Verify(jwtTokenStr string) (extClaims map[string]interface{}
 	jwtToken, err := jwt.ParseSigned(jwtTokenStr, []jose.SignatureAlgorithm{jose.SignatureAlgorithm(key.Algorithm)})
 	if err != nil {
 		j.logger.Error(err)
-		return
+		return nil, errors.NewHTTPError(http.StatusUnauthorized, "token invalid", nil)
 	}
 
-	var cclaims CustomClaims
+	claims = &interfaces.CustomClaims{}
 	switch key.Algorithm {
 	case "HS256", "HS384", "HS512":
-		err = jwtToken.Claims(key.Key, &cclaims)
+		err = jwtToken.Claims(key.Key, &claims)
 	default:
-		err = jwtToken.Claims(key.Public(), &cclaims)
+		err = jwtToken.Claims(key.Public(), &claims)
 	}
 	if err != nil {
 		j.logger.Error(err)
-		return
+		return nil, errors.NewHTTPError(http.StatusUnauthorized, "token invalid", nil)
 	}
 	expected := jwt.Expected{
 		Issuer:      "IAMService.com",
 		AnyAudience: jwt.Audience{"IAMService"},
 		Time:        time.Time{},
 	}
-	if err = cclaims.Claims.Validate(expected); err != nil {
+	if err = claims.Claims.Validate(expected); err != nil {
 		j.logger.Info(err)
-		return
+		return nil, errors.NewHTTPError(http.StatusUnauthorized, "token invalid", nil)
 	}
 
-	return cclaims.ExtClaims, err
+	exists, err := j.dbJWT.GetBlacklist(claims.Claims.ID)
+	if err != nil {
+		j.logger.Error(err)
+		return nil, err
+	}
+	if exists {
+		return nil, errors.NewHTTPError(http.StatusUnauthorized, "token revoked", nil)
+	}
+
+	return claims, err
+}
+
+func (j *logicsJWT) RevokeToken(jwtTokenStr string) (err error) {
+	claims, err := j.Verify(jwtTokenStr)
+	if err != nil {
+		if e, ok := err.(*errors.HTTPError); ok {
+			if e.StatusCode() == http.StatusUnauthorized {
+				return nil
+			}
+		}
+		return err
+	}
+
+	if err = j.dbJWT.AddBlacklist(claims.ID); err != nil {
+		j.logger.Error(err)
+		return err
+	}
+
+	return nil
 }
 
 func (j *logicsJWT) loadORGenerateKeys(setID, alg string) (key *jose.JSONWebKey, err error) {

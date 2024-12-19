@@ -21,3 +21,9 @@ CREATE TABLE IF NOT EXISTS `t_jwt_keys` (
   UNIQUE KEY `idx_sid` (`sid`),
   KEY `idx_created_at` (`created_at`)
 )ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `t_jwt_blacklist` (
+  `id` varchar(36) NOT NULL,
+  `created_at` timestamp DEFAULT current_timestamp,
+  PRIMARY KEY (`id`)
+)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

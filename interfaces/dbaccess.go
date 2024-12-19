@@ -19,4 +19,7 @@ type DBJWT interface {
 	AddKeySet(setID string, keySet *jose.JSONWebKeySet) error
 	GetKeySet(setID string) (kSet *jose.JSONWebKeySet, err error)
 	GetKey(kid string) (key *jose.JSONWebKey, err error)
+
+	AddBlacklist(id string) error
+	GetBlacklist(id string) (exists bool, err error)
 }

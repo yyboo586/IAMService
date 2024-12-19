@@ -24,7 +24,7 @@ func AuthRequired(loJWT interfaces.LogicsJWT) gin.HandlerFunc {
 			return
 		}
 
-		extClaims, err := loJWT.Verify(tokenInfos[1])
+		claims, err := loJWT.Verify(tokenInfos[1])
 		if err != nil {
 			rest.ReplyError(c, errUtils.NewHTTPError(http.StatusUnauthorized, "token is invalid", nil))
 			c.Abort()
@@ -32,7 +32,7 @@ func AuthRequired(loJWT interfaces.LogicsJWT) gin.HandlerFunc {
 		}
 
 		// 将令牌信息放入上下文
-		ctx := context.WithValue(context.WithValue(context.WithValue(c.Request.Context(), rest.ClaimsKey, extClaims), rest.TokenKey, tokenInfos[1]), rest.URIKey, c.Request.RequestURI)
+		ctx := context.WithValue(context.WithValue(context.WithValue(c.Request.Context(), rest.ClaimsKey, claims.ExtClaims), rest.TokenKey, tokenInfos[1]), rest.URIKey, c.Request.RequestURI)
 		c.Request = c.Request.WithContext(ctx)
 		c.Next()
 	}

@@ -95,3 +95,24 @@ func (j *dbJWT) GetKey(kid string) (key *jose.JSONWebKey, err error) {
 
 	return key, nil
 }
+
+func (j *dbJWT) AddBlacklist(id string) error {
+	sqlStr := "INSERT INTO t_jwt_blacklist(id) VALUES(?)"
+
+	if _, err := j.dbPool.Exec(sqlStr, id); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (j *dbJWT) GetBlacklist(id string) (exists bool, err error) {
+	sqlStr := "SELECT COUNT(*) FROM t_jwt_blacklist WHERE id = ?"
+
+	var count int
+	if err = j.dbPool.QueryRow(sqlStr, id).Scan(&count); err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
