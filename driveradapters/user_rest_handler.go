@@ -1,7 +1,9 @@
 package driveradapters
 
 import (
+	"context"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/yyboo586/IAMService/interfaces"
@@ -11,10 +13,13 @@ import (
 	"github.com/casbin/casbin/v2"
 	"github.com/xeipuuv/gojsonschema"
 
-	"github.com/yyboo586/IAMService/utils/rest"
-	"github.com/yyboo586/IAMService/utils/rest/middleware"
+	"github.com/yyboo586/common/rest"
 
 	"github.com/gin-gonic/gin"
+)
+
+var (
+	_ interfaces.RESTHandler = (*UserHandler)(nil)
 )
 
 var (
@@ -54,12 +59,8 @@ func NewUserHandler() *UserHandler {
 }
 
 func (u *UserHandler) RegisterPublic(engine *gin.Engine) {
-	checkRequired := engine.Group("/", middleware.AuthRequired(u.logicsJWT), middleware.PermissionRequired(u.e))
-	{
-		checkRequired.GET("/api/v1/IAMService/users/:id", u.getUserInfo)
-
-		checkRequired.POST("/api/v1/IAMService/users", u.create)
-	}
+	engine.GET("/api/v1/IAMService/users/:id", u.getUserInfo)
+	engine.POST("/api/v1/IAMService/users", u.create)
 
 	engine.Handle(http.MethodGet, "/api/v1/IAMService/ready", u.ready)
 	engine.Handle(http.MethodGet, "/api/v1/IAMService/health", u.health)
@@ -67,9 +68,28 @@ func (u *UserHandler) RegisterPublic(engine *gin.Engine) {
 	engine.Handle(http.MethodPost, "/api/v1/IAMService/user-login", u.login)
 }
 
+func (u *UserHandler) authRequired(c *gin.Context) (ctx context.Context, err error) {
+	tokenInfos := strings.Split(c.GetHeader("Authorization"), " ")
+	if len(tokenInfos) < 2 {
+		return c.Request.Context(), rest.NewHTTPError(http.StatusUnauthorized, "token is invalid", nil)
+	}
+
+	claims, err := u.logicsJWT.Verify(tokenInfos[1])
+	if err != nil {
+		return c.Request.Context(), rest.NewHTTPError(http.StatusUnauthorized, "token is invalid", nil)
+	}
+
+	// 将令牌信息放入上下文
+	ctx = context.WithValue(context.WithValue(c.Request.Context(), interfaces.ClaimsKey, claims.ExtClaims), interfaces.TokenKey, tokenInfos[1])
+	return ctx, nil
+}
+
 func (u *UserHandler) create(c *gin.Context) {
-	userInfo := interfaces.NewUser()
-	defer interfaces.FreeUser(userInfo)
+	ctx, err := u.authRequired(c)
+	if err != nil {
+		rest.ReplyError(c, err)
+		return
+	}
 
 	body, err := Validate(c, u.userCreateSchema)
 	if err != nil {
@@ -77,13 +97,14 @@ func (u *UserHandler) create(c *gin.Context) {
 		return
 	}
 
+	userInfo := &interfaces.User{}
 	userInfo.Name = body.(map[string]interface{})["name"].(string)
 	userInfo.Password = body.(map[string]interface{})["password"].(string)
 	if email, ok := body.(map[string]interface{})["email"]; ok {
 		userInfo.Email = email.(string)
 	}
 
-	err = u.logicsUser.Create(c.Request.Context(), userInfo)
+	err = u.logicsUser.Create(ctx, userInfo)
 	if err != nil {
 		rest.ReplyError(c, err)
 		return
@@ -116,9 +137,14 @@ func (u *UserHandler) login(c *gin.Context) {
 }
 
 func (u *UserHandler) getUserInfo(c *gin.Context) {
-	id := c.Param("id")
+	ctx, err := u.authRequired(c)
+	if err != nil {
+		rest.ReplyError(c, err)
+		return
+	}
 
-	userInfo, err := u.logicsUser.GetUserInfo(c.Request.Context(), id)
+	id := c.Param("id")
+	userInfo, err := u.logicsUser.GetUserInfo(ctx, id)
 	if err != nil {
 		rest.ReplyError(c, err)
 		return

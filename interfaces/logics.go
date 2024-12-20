@@ -2,7 +2,6 @@ package interfaces
 
 import (
 	"context"
-	"sync"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
@@ -15,20 +14,6 @@ type User struct {
 	Name     string
 	Password string
 	Email    string
-}
-
-var free = sync.Pool{
-	New: func() any {
-		return &User{}
-	},
-}
-
-func NewUser() *User {
-	return free.Get().(*User)
-}
-
-func FreeUser(user *User) {
-	free.Put(user)
 }
 
 type LogicsUser interface {

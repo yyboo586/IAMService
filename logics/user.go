@@ -2,7 +2,6 @@ package logics
 
 import (
 	"context"
-	"crypto/rsa"
 	"net/http"
 	"regexp"
 	"strings"
@@ -12,8 +11,7 @@ import (
 	"github.com/yyboo586/IAMService/interfaces"
 	"github.com/yyboo586/common/logUtils"
 
-	"github.com/yyboo586/IAMService/utils/rest"
-	errUtils "github.com/yyboo586/IAMService/utils/rest/errors"
+	"github.com/yyboo586/common/rest"
 
 	"github.com/gofrs/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -25,51 +23,55 @@ var (
 )
 
 type user struct {
-	pwdRegex   *regexp.Regexp
-	nameRegex  *regexp.Regexp
-	privateKey *rsa.PrivateKey
-	logger     *logUtils.Logger
-	mailer     interfaces.LogicsMailer
-	loJWT      interfaces.LogicsJWT
-	dbUser     interfaces.DBUser
+	pwdRegex  *regexp.Regexp
+	nameRegex *regexp.Regexp
+	logger    *logUtils.Logger
+	mailer    interfaces.LogicsMailer
+	jwt       interfaces.LogicsJWT
+	dbUser    interfaces.DBUser
 }
 
 func NewUser() *user {
 	uOnce.Do(func() {
 		u = &user{
-			pwdRegex:   regexp.MustCompile(`^[a-zA-Z0-9]{6,12}$`),
-			nameRegex:  regexp.MustCompile(`^[\p{Han}a-zA-Z0-9]{1,10}$`),
-			privateKey: privateKey,
-			logger:     loggerInstance,
-			mailer:     NewLogicsMailer(),
-			loJWT:      NewLogicsJWT(),
-			dbUser:     dbaccess.NewUser(),
+			pwdRegex:  regexp.MustCompile(`^[a-zA-Z0-9]{6,12}$`),
+			nameRegex: regexp.MustCompile(`^[\p{Han}a-zA-Z0-9]{1,10}$`),
+			logger:    loggerInstance,
+			mailer:    NewLogicsMailer(),
+			jwt:       NewLogicsJWT(),
+			dbUser:    dbaccess.NewUser(),
 		}
 	})
 	return u
 }
 
 func (u *user) Create(ctx context.Context, userInfo *interfaces.User) (err error) {
-	if err = u.validate(userInfo); err != nil {
+	// 校验注册信息是否符合规范
+	if err = u.validateUserInfo(userInfo); err != nil {
 		return err
 	}
 
-	_, exists, err := u.dbUser.FetchByName(userInfo.Name)
+	// 检查用户名是否已存在
+	_, exists, err := u.dbUser.GetUserInfoByName(userInfo.Name)
 	if err != nil {
-		return errUtils.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
+		u.logger.Errorf("failed to get user info by name: %v", err)
+		return rest.NewHTTPError(http.StatusInternalServerError, "服务器内部错误，请联系管理员", nil)
 	}
 	if exists {
-		return errUtils.NewHTTPError(http.StatusConflict, "name already exists", nil)
+		return rest.NewHTTPError(http.StatusConflict, "用户名已存在", nil)
 	}
 
-	cipherText, _ := bcrypt.GenerateFromPassword([]byte(userInfo.Password), bcrypt.DefaultCost)
+	cipherText, err := bcrypt.GenerateFromPassword([]byte(userInfo.Password), bcrypt.DefaultCost)
+	if err != nil {
+		u.logger.Errorf("failed to generate password: %v", err)
+		return rest.NewHTTPError(http.StatusInternalServerError, "服务器内部错误，请联系管理员", nil)
+	}
 	userInfo.Password = string(cipherText)
-
 	userInfo.ID = uuid.Must(uuid.NewV4()).String()
 
-	err = u.dbUser.Create(userInfo)
-	if err != nil {
-		return errUtils.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
+	if err = u.dbUser.Create(userInfo); err != nil {
+		u.logger.Errorf("failed to create user: %v", err)
+		return rest.NewHTTPError(http.StatusInternalServerError, "服务器内部错误，请联系管理员", nil)
 	}
 
 	// 不保证可以发送成功
@@ -93,8 +95,7 @@ func (u *user) Create(ctx context.Context, userInfo *interfaces.User) (err error
 
 func (u *user) Login(name, passwd string) (id string, jwtTokenStr string, err error) {
 	if name == "" || passwd == "" {
-		err = errUtils.NewHTTPError(http.StatusBadRequest, "invalid name or password", nil)
-		return
+		return "", "", rest.NewHTTPError(http.StatusBadRequest, "invalid name or password", nil)
 	}
 
 	// 引入固定时间延迟
@@ -106,69 +107,67 @@ func (u *user) Login(name, passwd string) (id string, jwtTokenStr string, err er
 	// 	time.Sleep(100 * time.Millisecond)
 	// }()
 
-	user, exists, err := u.dbUser.FetchByName(name)
+	user, exists, err := u.dbUser.GetUserInfoByName(name)
 	if err != nil {
-		err = errUtils.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
-		return
+		u.logger.Debugf("failed to get user info by name: %v", err)
+		return "", "", rest.InternalServerError
 	}
 	if !exists {
-		err = errUtils.NewHTTPError(http.StatusBadRequest, "invalid name or password", nil)
-		return
+		return "", "", rest.NewHTTPError(http.StatusBadRequest, "invalid name or password", nil)
 	}
 
 	if err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(passwd)); err != nil {
-		err = errUtils.NewHTTPError(http.StatusBadRequest, "invalid name or password", nil)
-		return
+		u.logger.Debugf("failed to compare hash and password: %v", err)
+		return "", "", rest.NewHTTPError(http.StatusBadRequest, "invalid name or password", nil)
 	}
 
 	if err = u.dbUser.UpdateLoginTime(user.ID); err != nil {
-		err = errUtils.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
-		return
+		u.logger.Debugf("failed to update login time: %v", err)
+		return "", "", rest.InternalServerError
 	}
 
 	claims := map[string]interface{}{
 		"id":   user.ID,
 		"name": user.Name,
 	}
-	if jwtTokenStr, err = u.loJWT.Sign(user.ID, claims, "ac_token", "RS256"); err != nil {
-		err = errUtils.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
-		return
+	if jwtTokenStr, err = u.jwt.Sign(user.ID, claims, "ac_token", "RS256"); err != nil {
+		u.logger.Debugf("failed to sign jwt: %v", err)
+		return "", "", rest.InternalServerError
 	}
 
 	return user.ID, jwtTokenStr, nil
 }
 
 func (u *user) GetUserInfo(ctx context.Context, id string) (userInfo *interfaces.User, err error) {
-	// log.Printf("DEBUG: ExtClaims: %v, jwtToken: %v\n", ctx.Value(interfaces.ClaimsKey).(map[string]interface{}), ctx.Value(interfaces.TokenKey).(string))
+	u.logger.Debugf("ExtClaims: %v, jwtToken: %v\n", ctx.Value(interfaces.ClaimsKey).(map[string]interface{}), ctx.Value(interfaces.TokenKey).(string))
 	// 只能获取自己的数据
-	if id != ctx.Value(rest.ClaimsKey).(map[string]interface{})["id"].(string) {
-		err = errUtils.NewHTTPError(http.StatusForbidden, "no permission", nil)
-		return
+	if id != ctx.Value(interfaces.ClaimsKey).(map[string]interface{})["id"].(string) {
+		return nil, rest.Forbidden
 	}
 
 	var exists bool
 	userInfo, exists, err = u.dbUser.GetUserInfoByID(id)
 	if err != nil {
-		err = errUtils.NewHTTPError(http.StatusInternalServerError, err.Error(), nil)
-		return
+		u.logger.Debugf("failed to get user info by id: %v", err)
+		return nil, rest.InternalServerError
 	}
 	if !exists {
-		err = errUtils.NewHTTPError(http.StatusNotFound, "user not found", nil)
-		return
+		u.logger.Debugf("user not found")
+		return nil, rest.NotFound
 	}
 
-	return
+	return userInfo, nil
 }
 
-func (u *user) validate(userInfo *interfaces.User) error {
+func (u *user) validateUserInfo(userInfo *interfaces.User) error {
 	userInfo.Name = strings.Trim(userInfo.Name, " ")
 
 	if !u.nameRegex.MatchString(userInfo.Name) {
-		return errUtils.NewHTTPError(http.StatusBadRequest, "invalid name", nil)
+		return rest.NewHTTPError(http.StatusBadRequest, "invalid name", nil)
 	}
 
 	if !u.pwdRegex.MatchString(userInfo.Password) {
-		return errUtils.NewHTTPError(http.StatusBadRequest, "invalid password", nil)
+		return rest.NewHTTPError(http.StatusBadRequest, "invalid password", nil)
 	}
 
 	return nil

@@ -7,7 +7,6 @@ import (
 	"github.com/yyboo586/IAMService/interfaces"
 	"github.com/yyboo586/IAMService/logics"
 
-	"github.com/casbin/casbin/v2"
 	"github.com/go-mail/mail/v2"
 
 	configUtils "github.com/yyboo586/IAMService/utils/config"
@@ -39,23 +38,15 @@ func (s *Server) Start() {
 
 func main() {
 	config := configUtils.Default()
-
 	dbPool, err := dbUtils.NewDB(&config.DBConfig)
 	if err != nil {
 		panic(err)
 	}
-
-	mailDialer := mail.NewDialer(config.Mailer.Host, config.Mailer.Port, config.Mailer.User, config.Mailer.Pass)
-
-	e, err := casbin.NewEnforcer("model.conf", "policy.csv")
-	if err != nil {
-		panic(err)
-	}
-
 	logger, err := logUtils.NewLogger(config.Logger.Level)
 	if err != nil {
 		panic(err)
 	}
+	mailDialer := mail.NewDialer(config.Mailer.Host, config.Mailer.Port, config.Mailer.User, config.Mailer.Pass)
 
 	// 依赖注入
 	dbaccess.SetDBPool(dbPool)
@@ -65,7 +56,6 @@ func main() {
 
 	logics.SetLogger(logger)
 
-	driveradapters.SetEnforcer(e)
 	driveradapters.SetLogger(logger)
 
 	s := &Server{

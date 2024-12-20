@@ -7,8 +7,8 @@ import (
 
 	_ "embed"
 
-	errUtils "github.com/yyboo586/IAMService/utils/rest/errors"
 	"github.com/yyboo586/common/logUtils"
+	"github.com/yyboo586/common/rest"
 
 	"github.com/casbin/casbin/v2"
 	"github.com/gin-gonic/gin"
@@ -39,7 +39,6 @@ func Validate(c *gin.Context, schema *gojsonschema.Schema) (i interface{}, err e
 	data, _ := io.ReadAll(c.Request.Body)
 	_ = json.Unmarshal(data, &i)
 
-	// return schema.Validate()
 	results, err := schema.Validate(gojsonschema.NewGoLoader(i))
 	if err != nil {
 		return nil, err
@@ -47,10 +46,9 @@ func Validate(c *gin.Context, schema *gojsonschema.Schema) (i interface{}, err e
 	if !results.Valid() {
 		details := make(map[string]interface{})
 		for _, tmpErr := range results.Errors() {
-			// log.Println(tmpErr)
 			details[tmpErr.Field()] = tmpErr.Description()
 		}
-		return nil, errUtils.NewHTTPError(http.StatusBadRequest, "invalid request body", details)
+		return nil, rest.NewHTTPError(http.StatusBadRequest, "invalid request body", details)
 	}
 
 	return i, nil

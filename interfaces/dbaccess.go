@@ -9,8 +9,8 @@ type DBUser interface {
 	Create(user *User) error
 	// GetUserInfoByID fetches a user by id.
 	GetUserInfoByID(id string) (*User, bool, error)
-	// FetchByName fetches a user by name.
-	FetchByName(name string) (*User, bool, error)
+	// GetUserInfoByName fetches a user by name.
+	GetUserInfoByName(name string) (*User, bool, error)
 	// UpdateLoginTime updates the last login time of a user.
 	UpdateLoginTime(id string) error
 }

@@ -44,7 +44,7 @@ var defaultConfig = Config{
 	Server: struct {
 		Addr string
 	}{
-		Addr: "0.0.0.0:10001",
+		Addr: "127.0.0.1:12000",
 	},
 	Logger: struct {
 		Level string

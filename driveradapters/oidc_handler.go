@@ -8,8 +8,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/yyboo586/IAMService/interfaces"
 	"github.com/yyboo586/IAMService/logics"
-	"github.com/yyboo586/IAMService/utils/rest"
-	"github.com/yyboo586/IAMService/utils/rest/errors"
+	"github.com/yyboo586/common/rest"
+)
+
+var (
+	_ interfaces.RESTHandler = (*OIDCHandler)(nil)
 )
 
 var (
@@ -51,7 +54,7 @@ func (o *OIDCHandler) GetPublicKey(c *gin.Context) {
 func (o *OIDCHandler) RevokeToken(c *gin.Context) {
 	token := c.GetHeader("Authorization")
 	if token == "" {
-		rest.ReplyError(c, errors.NewHTTPError(http.StatusUnauthorized, "token is required", nil))
+		rest.ReplyError(c, rest.NewHTTPError(http.StatusUnauthorized, "token is required", nil))
 		return
 	}
 

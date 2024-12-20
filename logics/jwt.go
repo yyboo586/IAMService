@@ -17,9 +17,9 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/yyboo586/IAMService/dbaccess"
 	"github.com/yyboo586/IAMService/interfaces"
-	"github.com/yyboo586/IAMService/utils/rest/errors"
 	"github.com/yyboo586/common/jwtUtils"
 	"github.com/yyboo586/common/logUtils"
+	"github.com/yyboo586/common/rest"
 )
 
 var (
@@ -101,7 +101,7 @@ func (j *logicsJWT) Verify(jwtTokenStr string) (claims *interfaces.CustomClaims,
 	jwtToken, err := jwt.ParseSigned(jwtTokenStr, []jose.SignatureAlgorithm{jose.SignatureAlgorithm(key.Algorithm)})
 	if err != nil {
 		j.logger.Error(err)
-		return nil, errors.NewHTTPError(http.StatusUnauthorized, "token invalid", nil)
+		return nil, rest.NewHTTPError(http.StatusUnauthorized, "token invalid", nil)
 	}
 
 	claims = &interfaces.CustomClaims{}
@@ -113,7 +113,7 @@ func (j *logicsJWT) Verify(jwtTokenStr string) (claims *interfaces.CustomClaims,
 	}
 	if err != nil {
 		j.logger.Error(err)
-		return nil, errors.NewHTTPError(http.StatusUnauthorized, "token invalid", nil)
+		return nil, rest.NewHTTPError(http.StatusUnauthorized, "token invalid", nil)
 	}
 	expected := jwt.Expected{
 		Issuer:      "IAMService.com",
@@ -122,7 +122,7 @@ func (j *logicsJWT) Verify(jwtTokenStr string) (claims *interfaces.CustomClaims,
 	}
 	if err = claims.Claims.Validate(expected); err != nil {
 		j.logger.Info(err)
-		return nil, errors.NewHTTPError(http.StatusUnauthorized, "token invalid", nil)
+		return nil, rest.NewHTTPError(http.StatusUnauthorized, "token invalid", nil)
 	}
 
 	exists, err := j.dbJWT.GetBlacklist(claims.Claims.ID)
@@ -131,7 +131,7 @@ func (j *logicsJWT) Verify(jwtTokenStr string) (claims *interfaces.CustomClaims,
 		return nil, err
 	}
 	if exists {
-		return nil, errors.NewHTTPError(http.StatusUnauthorized, "token revoked", nil)
+		return nil, rest.NewHTTPError(http.StatusUnauthorized, "token revoked", nil)
 	}
 
 	return claims, err
@@ -140,7 +140,7 @@ func (j *logicsJWT) Verify(jwtTokenStr string) (claims *interfaces.CustomClaims,
 func (j *logicsJWT) RevokeToken(jwtTokenStr string) (err error) {
 	claims, err := j.Verify(jwtTokenStr)
 	if err != nil {
-		if e, ok := err.(*errors.HTTPError); ok {
+		if e, ok := err.(*rest.HTTPError); ok {
 			if e.StatusCode() == http.StatusUnauthorized {
 				return nil
 			}
