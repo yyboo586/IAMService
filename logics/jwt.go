@@ -156,10 +156,12 @@ func (j *logicsJWT) RevokeToken(jwtTokenStr string) (err error) {
 	return nil
 }
 
-func (j *logicsJWT) loadORGenerateKeys(setID, alg string) (key *jose.JSONWebKey, err error) {
+func (j *logicsJWT) loadORGenerateKeys(setID, alg string) (*jose.JSONWebKey, error) {
 	j.cacheLock.RLock()
 	if kSet, ok := j.keysCache[setID]; ok {
-		return &kSet.Keys[0], nil
+		key := kSet.Keys[0]
+		j.cacheLock.RUnlock()
+		return &key, nil
 	}
 	j.cacheLock.RUnlock()
 
@@ -184,7 +186,8 @@ func (j *logicsJWT) loadORGenerateKeys(setID, alg string) (key *jose.JSONWebKey,
 
 	j.keysCache[setID] = kSet
 
-	return &kSet.Keys[0], nil
+	key := kSet.Keys[0]
+	return &key, nil
 }
 
 func (j *logicsJWT) generateAndPersistJWKSet(setID, alg, kid, use string) (kSet *jose.JSONWebKeySet, err error) {
@@ -249,7 +252,7 @@ func getKid(jwtTokenStr string) (alg string, err error) {
 	return header["kid"].(string), nil
 }
 
-func (j *logicsJWT) getKey(kid string) (key *jose.JSONWebKey, err error) {
+func (j *logicsJWT) getKey(kid string) (*jose.JSONWebKey, error) {
 	j.cacheLock.Lock()
 	defer j.cacheLock.Unlock()
 
@@ -261,7 +264,7 @@ func (j *logicsJWT) getKey(kid string) (key *jose.JSONWebKey, err error) {
 		}
 	}
 
-	key, err = j.dbJWT.GetKey(kid)
+	key, err := j.dbJWT.GetKey(kid)
 	if err != nil {
 		return nil, fmt.Errorf("get key failed: %w", err)
 	}
