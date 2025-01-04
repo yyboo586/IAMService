@@ -1,6 +1,9 @@
 package main
 
 import (
+	"net/http"
+	"strings"
+
 	"github.com/yyboo586/IAMService/dbaccess"
 	"github.com/yyboo586/IAMService/drivenadapters"
 	"github.com/yyboo586/IAMService/driveradapters"
@@ -23,9 +26,35 @@ type Server struct {
 	config      *configUtils.Config
 }
 
+var (
+	// allowOrigins = []string{"http://127.0.0.1:5000", "http://127.0.0.1:5001", "http://127.0.0.1:5501"}
+	allowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
+	allowHeaders = []string{"Content-Type", "Authorization"}
+)
+
+func cors() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		origin := c.Request.Header.Get("Origin")
+		if origin != "" {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+		}
+
+		c.Writer.Header().Set("Access-Control-Allow-Methods", strings.Join(allowMethods, ", "))
+		c.Writer.Header().Set("Access-Control-Allow-Headers", strings.Join(allowHeaders, ", "))
+		c.Writer.Header().Set("Access-Control-Max-Age", "3600")
+		if c.Request.Method == "OPTIONS" {
+			c.Writer.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		c.Next()
+	}
+}
+
 func (s *Server) Start() {
 	go func() {
 		engine := gin.Default()
+		engine.Use(cors())
 
 		s.userHandler.RegisterPublic(engine)
 		s.oidcHandler.RegisterPublic(engine)
