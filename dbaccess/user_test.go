@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartystreets/goconvey/convey"
 	"github.com/yyboo586/IAMService/interfaces"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,7 +25,7 @@ func newUser(db *sql.DB) *user {
 }
 
 func TestCreate(t *testing.T) {
-	Convey("Test DBUser Create()", t, func() {
+	convey.Convey("Test DBUser Create()", t, func() {
 		db, mock, err := sqlmock.New()
 		if err != nil {
 			t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
@@ -33,7 +33,7 @@ func TestCreate(t *testing.T) {
 		defer db.Close()
 
 		dbUser := newUser(db)
-		Convey("数据插入成功", func() {
+		convey.Convey("数据插入成功", func() {
 			u := &interfaces.User{
 				ID:       "id",
 				Name:     "test",
@@ -52,7 +52,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestGetUserInfoByID(t *testing.T) {
-	Convey("Test DBUser GetUserInfoByID()", t, func() {
+	convey.Convey("Test DBUser GetUserInfoByID()", t, func() {
 		db, mock, err := sqlmock.New()
 		if err != nil {
 			t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
@@ -60,7 +60,7 @@ func TestGetUserInfoByID(t *testing.T) {
 		defer db.Close()
 
 		dbUser := newUser(db)
-		Convey("数据库错误", func() {
+		convey.Convey("数据库错误", func() {
 			mock.ExpectQuery("select").WithArgs("dbError").WillReturnError(errDatabase)
 
 			_, _, err := dbUser.GetUserInfoByID("dbError")
@@ -70,7 +70,7 @@ func TestGetUserInfoByID(t *testing.T) {
 				t.Errorf("there were unfulfilled expectations: %s", err)
 			}
 		})
-		Convey("数据不存在", func() {
+		convey.Convey("数据不存在", func() {
 			mock.ExpectQuery("select").WithArgs("NonExistUser").WillReturnError(sql.ErrNoRows)
 
 			_, exists, err := dbUser.GetUserInfoByID("NonExistUser")
@@ -81,7 +81,7 @@ func TestGetUserInfoByID(t *testing.T) {
 				t.Errorf("there were unfulfilled expectations: %s", err)
 			}
 		})
-		Convey("数据存在，读取成功", func() {
+		convey.Convey("数据存在，读取成功", func() {
 			u := &interfaces.User{
 				ID:   "id",
 				Name: "tom",
@@ -102,7 +102,7 @@ func TestGetUserInfoByID(t *testing.T) {
 }
 
 func TestGetUserInfoByName(t *testing.T) {
-	Convey("Test DBUser GetUserInfoByName()", t, func() {
+	convey.Convey("Test DBUser GetUserInfoByName()", t, func() {
 		db, mock, err := sqlmock.New()
 		if err != nil {
 			t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
@@ -110,7 +110,7 @@ func TestGetUserInfoByName(t *testing.T) {
 		defer db.Close()
 
 		dbUser := newUser(db)
-		Convey("数据不存在", func() {
+		convey.Convey("数据不存在", func() {
 			mock.ExpectQuery("select").WithArgs("NonExistUser").WillReturnError(sql.ErrNoRows)
 
 			_, exists, err := dbUser.GetUserInfoByName("NonExistUser")
@@ -121,7 +121,7 @@ func TestGetUserInfoByName(t *testing.T) {
 				t.Errorf("there were unfulfilled expectations: %s", err)
 			}
 		})
-		Convey("数据库错误", func() {
+		convey.Convey("数据库错误", func() {
 			mock.ExpectQuery("select").WithArgs("dbError").WillReturnError(errDatabase)
 
 			_, _, err := dbUser.GetUserInfoByName("dbError")
@@ -131,7 +131,7 @@ func TestGetUserInfoByName(t *testing.T) {
 				t.Errorf("there were unfulfilled expectations: %s", err)
 			}
 		})
-		Convey("数据存在，读取成功", func() {
+		convey.Convey("数据存在，读取成功", func() {
 			u := &interfaces.User{
 				ID:       "id",
 				Name:     "tom",
@@ -153,7 +153,7 @@ func TestGetUserInfoByName(t *testing.T) {
 }
 
 func TestUpdateLoginTime(t *testing.T) {
-	Convey("Test DBUser UpdateLoginTime()", t, func() {
+	convey.Convey("Test DBUser UpdateLoginTime()", t, func() {
 		db, mock, err := sqlmock.New()
 		if err != nil {
 			t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
@@ -161,17 +161,17 @@ func TestUpdateLoginTime(t *testing.T) {
 		defer db.Close()
 
 		dbUser := newUser(db)
-		Convey("数据更新失败", func() {
+		convey.Convey("数据更新失败", func() {
 			mock.ExpectExec("update").WithArgs(time.Now().Format("2006-01-02 15:04:05"), "id").WillReturnError(errDatabase)
 
 			err = dbUser.UpdateLoginTime("id")
 
 			assert.Equal(t, fmt.Errorf("dbaccess: UpdateLoginTime error: %w", errDatabase), err)
-			if err := mock.ExpectationsWereMet(); err != nil {
+			if err = mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("there were unfulfilled expectations: %s", err)
 			}
 		})
-		Convey("数据更新成功", func() {
+		convey.Convey("数据更新成功", func() {
 			mock.ExpectExec("update").WithArgs(time.Now().Format("2006-01-02 15:04:05"), "id").WillReturnResult(sqlmock.NewResult(1, 1))
 
 			err = dbUser.UpdateLoginTime("id")

@@ -6,7 +6,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/go-jose/go-jose/v4"
-	. "github.com/smartystreets/goconvey/convey"
+	"github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 	"github.com/yyboo586/IAMService/interfaces"
 )
@@ -20,7 +20,7 @@ func setupJWTTest(t *testing.T) (*sql.DB, sqlmock.Sqlmock, interfaces.DBJWT) {
 
 func TestAddKeySet(t *testing.T) {
 
-	Convey("Test DBJWT AddKeySet()", t, func() {
+	convey.Convey("Test DBJWT AddKeySet()", t, func() {
 		db, mock, jwt := setupJWTTest(t)
 		defer db.Close()
 
@@ -37,7 +37,7 @@ func TestAddKeySet(t *testing.T) {
 			},
 		}
 
-		Convey("空keySet", func() {
+		convey.Convey("空keySet", func() {
 			err := jwt.AddKeySet("test-set", &jose.JSONWebKeySet{})
 
 			assert.Equal(t, nil, err)
@@ -45,7 +45,7 @@ func TestAddKeySet(t *testing.T) {
 				t.Errorf("there were unfulfilled expectations: %s", err)
 			}
 		})
-		Convey("数据库错误", func() {
+		convey.Convey("数据库错误", func() {
 			mock.ExpectExec("INSERT INTO t_jwt_keys").
 				WillReturnError(sql.ErrConnDone)
 
@@ -56,7 +56,7 @@ func TestAddKeySet(t *testing.T) {
 				t.Errorf("there were unfulfilled expectations: %s", err)
 			}
 		})
-		Convey("添加成功", func() {
+		convey.Convey("添加成功", func() {
 			// 预期的SQL执行
 			mock.ExpectExec("INSERT INTO t_jwt_keys").
 				WithArgs("key1", sqlmock.AnyArg(), "test-set", "key2", sqlmock.AnyArg(), "test-set").
@@ -75,8 +75,8 @@ func TestGetKeySet(t *testing.T) {
 	db, mock, jwt := setupJWTTest(t)
 	defer db.Close()
 
-	Convey("Test DBJWT GetKeySet()", t, func() {
-		Convey("数据库错误", func() {
+	convey.Convey("Test DBJWT GetKeySet()", t, func() {
+		convey.Convey("数据库错误", func() {
 			mock.ExpectQuery("SELECT").
 				WillReturnError(sql.ErrConnDone)
 
@@ -87,7 +87,7 @@ func TestGetKeySet(t *testing.T) {
 				t.Errorf("there were unfulfilled expectations: %s", err)
 			}
 		})
-		Convey("获取成功", func() {
+		convey.Convey("获取成功", func() {
 			rows := sqlmock.NewRows([]string{"data"}).
 				AddRow(`{"use":"sig","kty":"oct","kid":"key1","alg":"HS256","k":"Rmt0UGo5SmRERlg3TVNCYURRUGJ1UTdma3BkU1FocG8"}`)
 			mock.ExpectQuery("SELECT").
@@ -110,8 +110,8 @@ func TestGetKey(t *testing.T) {
 	db, mock, jwt := setupJWTTest(t)
 	defer db.Close()
 
-	Convey("Test DBJWT GetKey()", t, func() {
-		Convey("数据库错误", func() {
+	convey.Convey("Test DBJWT GetKey()", t, func() {
+		convey.Convey("数据库错误", func() {
 			mock.ExpectQuery("SELECT").
 				WillReturnError(sql.ErrConnDone)
 
@@ -122,7 +122,7 @@ func TestGetKey(t *testing.T) {
 				t.Errorf("there were unfulfilled expectations: %s", err)
 			}
 		})
-		Convey("获取成功", func() {
+		convey.Convey("获取成功", func() {
 			rows := sqlmock.NewRows([]string{"data"}).
 				AddRow(`{"use":"sig","kty":"oct","kid":"single-key","alg":"HS256","k":"Rmt0UGo5SmRERlg3TVNCYURRUGJ1UTdma3BkU1FocG8"}`)
 			mock.ExpectQuery("SELECT data FROM t_jwt_keys WHERE id").
@@ -144,8 +144,8 @@ func TestAddBlacklist(t *testing.T) {
 	db, mock, jwt := setupJWTTest(t)
 	defer db.Close()
 
-	Convey("Test DBJWT Blacklist()", t, func() {
-		Convey("数据库错误", func() {
+	convey.Convey("Test DBJWT Blacklist()", t, func() {
+		convey.Convey("数据库错误", func() {
 			mock.ExpectExec("INSERT INTO t_jwt_blacklist").
 				WithArgs("test-token").
 				WillReturnError(sql.ErrConnDone)
@@ -157,7 +157,7 @@ func TestAddBlacklist(t *testing.T) {
 				t.Errorf("there were unfulfilled expectations: %s", err)
 			}
 		})
-		Convey("添加成功", func() {
+		convey.Convey("添加成功", func() {
 			mock.ExpectExec("INSERT INTO t_jwt_blacklist").
 				WithArgs("test-token").
 				WillReturnResult(sqlmock.NewResult(1, 1))
@@ -176,8 +176,8 @@ func TestGetBlacklist(t *testing.T) {
 	db, mock, jwt := setupJWTTest(t)
 	defer db.Close()
 
-	Convey("Test DBJWT GetBlacklist()", t, func() {
-		Convey("数据库错误", func() {
+	convey.Convey("Test DBJWT GetBlacklist()", t, func() {
+		convey.Convey("数据库错误", func() {
 			mock.ExpectQuery("SELECT").
 				WithArgs("test-token").
 				WillReturnError(sql.ErrConnDone)
@@ -190,7 +190,7 @@ func TestGetBlacklist(t *testing.T) {
 				t.Errorf("there were unfulfilled expectations: %s", err)
 			}
 		})
-		Convey("获取成功", func() {
+		convey.Convey("获取成功", func() {
 			rows := sqlmock.NewRows([]string{"count"}).
 				AddRow(1)
 			mock.ExpectQuery("SELECT").

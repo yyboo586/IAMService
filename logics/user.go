@@ -31,7 +31,7 @@ type user struct {
 	dbUser    interfaces.DBUser
 }
 
-func NewUser() *user {
+func NewUser() interfaces.LogicsUser {
 	uOnce.Do(func() {
 		u = &user{
 			pwdRegex:  regexp.MustCompile(`^[a-zA-Z0-9]{6,12}$`),

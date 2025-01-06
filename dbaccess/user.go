@@ -20,7 +20,7 @@ type user struct {
 	logger *logUtils.Logger
 }
 
-func NewUser() *user {
+func NewUser() interfaces.DBUser {
 	uOnce.Do(func() {
 		u = &user{
 			db:     dbPool,

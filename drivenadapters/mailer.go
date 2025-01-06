@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	gomail "github.com/go-mail/mail/v2"
+	"github.com/yyboo586/IAMService/interfaces"
 	"github.com/yyboo586/common/logUtils"
 )
 
@@ -18,7 +19,7 @@ type mailer struct {
 	logger *logUtils.Logger
 }
 
-func NewMailer() *mailer {
+func NewMailer() interfaces.DrivenMailer {
 	mOnce.Do(func() {
 		m = &mailer{
 			dialer: mailDialer,
@@ -29,7 +30,7 @@ func NewMailer() *mailer {
 	return m
 }
 
-func (m *mailer) SendMail(ctx context.Context, to, from, title, plainBody, htmlBody string) (err error) {
+func (m *mailer) SendMail(_ context.Context, to, from, title, plainBody, htmlBody string) (err error) {
 	msg := gomail.NewMessage()
 
 	msg.SetHeader("To", to)

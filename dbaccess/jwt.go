@@ -3,7 +3,6 @@ package dbaccess
 import (
 	"database/sql"
 	"encoding/json"
-	"strings"
 	"sync"
 
 	"github.com/go-jose/go-jose/v4"
@@ -33,24 +32,28 @@ func (j *dbJWT) AddKeySet(setID string, keySet *jose.JSONWebKeySet) (err error) 
 		return nil
 	}
 
-	format := []string{}
-	values := []any{}
-	for _, key := range keySet.Keys {
-		data, err := json.Marshal(key)
+	return withTransaction(j.dbPool, func(tx *sql.Tx) error {
+		// 准备批量插入的SQL语句
+		stmt, err := tx.Prepare("INSERT INTO t_jwt_keys(id, data, sid) VALUES (?, ?, ?)")
 		if err != nil {
 			return err
 		}
+		defer stmt.Close()
 
-		format = append(format, "(?, ?, ?)")
-		values = append(values, key.KeyID, string(data), setID)
-	}
-	sqlStr := "INSERT INTO t_jwt_keys(id, data, sid) VALUES" + strings.Join(format, ",")
+		// 逐条插入数据
+		for _, key := range keySet.Keys {
+			data, err := json.Marshal(key)
+			if err != nil {
+				return err
+			}
 
-	if _, err = j.dbPool.Exec(sqlStr, values...); err != nil {
-		return err
-	}
+			if _, err = stmt.Exec(key.KeyID, string(data), setID); err != nil {
+				return err
+			}
+		}
 
-	return nil
+		return nil
+	})
 }
 
 func (j *dbJWT) GetKeySet(setID string) (kSet *jose.JSONWebKeySet, err error) {

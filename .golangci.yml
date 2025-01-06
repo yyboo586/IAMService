@@ -1,0 +1,35 @@
+linters:
+  disable:
+  enable:
+    - revive
+    - gofmt
+    - govet
+    - errcheck
+    - staticcheck
+    - gosimple
+    - ineffassign
+    - unused
+    - misspell
+    - gocyclo
+    - gosec
+
+run:
+  deadline: 5m
+  tests: true
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gosec
+        - errcheck
+  exclude-dirs:
+    - vendor/
+    - third_party/
+
+linters-settings:
+  gocyclo:
+    min-complexity: 15
+  golint:
+    min-confidence: 0.8
+  misspell:
+    locale: US 

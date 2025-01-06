@@ -15,7 +15,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	. "github.com/smartystreets/goconvey/convey"
+	"github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,7 +35,7 @@ func setupUserTest(jwt interfaces.LogicsJWT, dbUser interfaces.DBUser) interface
 }
 
 func TestCreate(t *testing.T) {
-	Convey("Create", t, func() {
+	convey.Convey("Create", t, func() {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
@@ -46,7 +46,7 @@ func TestCreate(t *testing.T) {
 			Name:     "tom",
 			Password: "123456",
 		}
-		Convey("用户名校验", func() {
+		convey.Convey("用户名校验", func() {
 			testCases := []struct {
 				name        string
 				expectedErr error
@@ -59,7 +59,7 @@ func TestCreate(t *testing.T) {
 			}
 
 			for _, tc := range testCases {
-				Convey(fmt.Sprintf("创建失败，用户名: %s", tc.name), func() {
+				convey.Convey(fmt.Sprintf("创建失败，用户名: %s", tc.name), func() {
 					invalidUser := &interfaces.User{
 						Name:     tc.name,
 						Password: "TestPass123",
@@ -71,7 +71,7 @@ func TestCreate(t *testing.T) {
 				})
 			}
 		})
-		Convey("密码校验", func() {
+		convey.Convey("密码校验", func() {
 			testCases := []struct {
 				password    string
 				expectedErr error
@@ -83,7 +83,7 @@ func TestCreate(t *testing.T) {
 			}
 
 			for _, tc := range testCases {
-				Convey(fmt.Sprintf("创建失败，用户密码: %s", tc.password), func() {
+				convey.Convey(fmt.Sprintf("创建失败，用户密码: %s", tc.password), func() {
 					invalidUser := &interfaces.User{
 						Name:     "tom",
 						Password: tc.password,
@@ -95,21 +95,21 @@ func TestCreate(t *testing.T) {
 				})
 			}
 		})
-		Convey("数据库错误1-GetUserInfoByName", func() {
+		convey.Convey("数据库错误1-GetUserInfoByName", func() {
 			dbUser.EXPECT().GetUserInfoByName(gomock.Any()).Return(nil, false, errors.New("database error"))
 
 			err := user.Create(context.Background(), validUser)
 
 			assert.Equal(t, rest.NewHTTPError(http.StatusInternalServerError, "服务器内部错误，请联系管理员", nil), err)
 		})
-		Convey("数据库错误2-Create", func() {
+		convey.Convey("数据库错误2-Create", func() {
 			dbUser.EXPECT().GetUserInfoByName(gomock.Any()).Return(nil, false, nil)
 			dbUser.EXPECT().Create(gomock.Any()).Return(errors.New("database error"))
 			err := user.Create(context.Background(), validUser)
 
 			assert.Equal(t, rest.NewHTTPError(http.StatusInternalServerError, "服务器内部错误，请联系管理员", nil), err)
 		})
-		Convey("用户名已存在", func() {
+		convey.Convey("用户名已存在", func() {
 
 			dbUser.EXPECT().GetUserInfoByName(gomock.Any()).Return(nil, true, nil)
 
@@ -117,7 +117,7 @@ func TestCreate(t *testing.T) {
 
 			assert.Equal(t, rest.NewHTTPError(http.StatusConflict, "用户名已存在", nil), err)
 		})
-		Convey("创建成功", func() {
+		convey.Convey("创建成功", func() {
 			testCases := []struct {
 				name     string
 				password string
@@ -147,7 +147,7 @@ func TestCreate(t *testing.T) {
 
 // TestLogin 测试登录功能
 func TestLogin(t *testing.T) {
-	Convey("Login", t, func() {
+	convey.Convey("Login", t, func() {
 		// 初始化测试环境
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -156,7 +156,7 @@ func TestLogin(t *testing.T) {
 		dbUser := mock.NewMockDBUser(ctrl)
 		user := setupUserTest(jwt, dbUser)
 		// 测试参数校验
-		Convey("参数校验", func() {
+		convey.Convey("参数校验", func() {
 			testCases := []struct {
 				name        string
 				passwd      string
@@ -169,7 +169,7 @@ func TestLogin(t *testing.T) {
 
 			// 遍历测试用例
 			for _, tc := range testCases {
-				Convey(fmt.Sprintf("登录失败，用户名: %s, 密码: %s", tc.name, tc.passwd), func() {
+				convey.Convey(fmt.Sprintf("登录失败，用户名: %s, 密码: %s", tc.name, tc.passwd), func() {
 					id, _, err := user.Login(tc.name, tc.passwd)
 
 					assert.Equal(t, "", id)
@@ -177,7 +177,7 @@ func TestLogin(t *testing.T) {
 				})
 			}
 		})
-		Convey("数据库错误, GetUserInfoByName failed", func() {
+		convey.Convey("数据库错误, GetUserInfoByName failed", func() {
 			dbUser.EXPECT().GetUserInfoByName(gomock.Any()).Return(nil, false, errors.New("database error"))
 
 			id, _, err := user.Login("tom", "123456")
@@ -185,7 +185,7 @@ func TestLogin(t *testing.T) {
 			assert.Equal(t, "", id)
 			assert.Equal(t, rest.InternalServerError, err)
 		})
-		Convey("用户名不存在", func() {
+		convey.Convey("用户名不存在", func() {
 			dbUser.EXPECT().GetUserInfoByName(gomock.Any()).Return(nil, false, nil)
 
 			id, _, err := user.Login("nonexistent", "123456")
@@ -193,7 +193,7 @@ func TestLogin(t *testing.T) {
 			assert.Equal(t, "", id)
 			assert.Equal(t, rest.NewHTTPError(http.StatusBadRequest, "invalid name or password", nil), err)
 		})
-		Convey("密码错误", func() {
+		convey.Convey("密码错误", func() {
 			hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("123456"), bcrypt.DefaultCost)
 
 			dbUser.EXPECT().GetUserInfoByName(gomock.Any()).Return(&interfaces.User{ID: "1", Name: "tom", Password: string(hashedPassword)}, true, nil)
@@ -203,7 +203,7 @@ func TestLogin(t *testing.T) {
 			assert.Equal(t, "", id)
 			assert.Equal(t, rest.NewHTTPError(http.StatusBadRequest, "invalid name or password", nil), err)
 		})
-		Convey("数据库错误, UpdateLoginTime failed", func() {
+		convey.Convey("数据库错误, UpdateLoginTime failed", func() {
 			hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("123456"), bcrypt.DefaultCost)
 			dbUser.EXPECT().GetUserInfoByName(gomock.Any()).Return(&interfaces.User{ID: "1", Name: "tom", Password: string(hashedPassword)}, true, nil)
 			dbUser.EXPECT().UpdateLoginTime(gomock.Any()).Return(errors.New("database error"))
@@ -213,7 +213,7 @@ func TestLogin(t *testing.T) {
 			assert.Equal(t, "", id)
 			assert.Equal(t, rest.InternalServerError, err)
 		})
-		Convey("jwt错误, Sign failed", func() {
+		convey.Convey("jwt错误, Sign failed", func() {
 			hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("123456"), bcrypt.DefaultCost)
 			dbUser.EXPECT().GetUserInfoByName(gomock.Any()).Return(&interfaces.User{ID: "1", Name: "tom", Password: string(hashedPassword)}, true, nil)
 			dbUser.EXPECT().UpdateLoginTime(gomock.Any()).Return(nil)
@@ -223,7 +223,7 @@ func TestLogin(t *testing.T) {
 
 			assert.Equal(t, rest.InternalServerError, err)
 		})
-		Convey("登录成功", func() {
+		convey.Convey("登录成功", func() {
 			hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("123456"), bcrypt.DefaultCost)
 			dbUser.EXPECT().GetUserInfoByName(gomock.Any()).Return(&interfaces.User{ID: "1", Name: "tom", Password: string(hashedPassword)}, true, nil)
 			dbUser.EXPECT().UpdateLoginTime(gomock.Any()).Return(nil)
@@ -239,7 +239,7 @@ func TestLogin(t *testing.T) {
 }
 
 func TestGetUserInfo(t *testing.T) {
-	Convey("GetUserInfo", t, func() {
+	convey.Convey("GetUserInfo", t, func() {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
@@ -249,21 +249,21 @@ func TestGetUserInfo(t *testing.T) {
 
 		claims := map[string]interface{}{"id": "id"}
 		ctx := context.WithValue(context.WithValue(context.Background(), interfaces.TokenKey, "jwtToken"), interfaces.ClaimsKey, claims)
-		Convey("数据库错误", func() {
+		convey.Convey("数据库错误", func() {
 			dbUser.EXPECT().GetUserInfoByID(gomock.Any()).Return(nil, false, errors.New("database error"))
 
 			_, err := user.GetUserInfo(ctx, "id")
 
 			assert.Equal(t, rest.InternalServerError, err)
 		})
-		Convey("用户不存在", func() {
+		convey.Convey("用户不存在", func() {
 			dbUser.EXPECT().GetUserInfoByID(gomock.Any()).Return(nil, false, nil)
 
 			_, err := user.GetUserInfo(ctx, "id")
 
 			assert.Equal(t, rest.NotFound, err)
 		})
-		Convey("获取用户信息成功", func() {
+		convey.Convey("获取用户信息成功", func() {
 			dbUser.EXPECT().GetUserInfoByID(gomock.Any()).Return(&interfaces.User{ID: "1", Name: "tom"}, true, nil)
 
 			userInfo, err := user.GetUserInfo(ctx, "id")
