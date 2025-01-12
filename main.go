@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/nsqio/go-nsq"
 	"github.com/yyboo586/IAMService/dbaccess"
 	"github.com/yyboo586/IAMService/drivenadapters"
 	"github.com/yyboo586/IAMService/driveradapters"
@@ -53,6 +54,7 @@ func cors() gin.HandlerFunc {
 
 func (s *Server) Start() {
 	go func() {
+		gin.SetMode(gin.ReleaseMode)
 		engine := gin.Default()
 		engine.Use(cors())
 
@@ -77,12 +79,20 @@ func main() {
 	}
 	mailDialer := mail.NewDialer(config.Mailer.Host, config.Mailer.Port, config.Mailer.User, config.Mailer.Pass)
 
+	producer, err := nsq.NewProducer("127.0.0.1:4150", nsq.NewConfig())
+	if err != nil {
+		panic(err)
+	}
+
 	// 依赖注入
 	dbaccess.SetDBPool(dbPool)
 	dbaccess.SetLogger(logger)
 
 	drivenadapters.SetMailDialer(mailDialer)
+	drivenadapters.SetMQProducer(producer)
+	drivenadapters.SetLogger(logger)
 
+	logics.SetDB(dbPool)
 	logics.SetLogger(logger)
 
 	driveradapters.SetLogger(logger)

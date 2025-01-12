@@ -31,10 +31,10 @@ func NewUser() interfaces.DBUser {
 	return u
 }
 
-func (u *user) Create(user *interfaces.User) (err error) {
+func (u *user) Create(tx *sql.Tx, user *interfaces.User) (err error) {
 	sqlStr := "insert into t_user (id, name, password) values(?, ?, ?)"
 
-	if _, err := u.db.Exec(sqlStr, user.ID, user.Name, user.Password); err != nil {
+	if _, err := tx.Exec(sqlStr, user.ID, user.Name, user.Password); err != nil {
 		return fmt.Errorf("dbaccess: create user error: %w", err)
 	}
 

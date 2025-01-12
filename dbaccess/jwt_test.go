@@ -9,17 +9,20 @@ import (
 	"github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 	"github.com/yyboo586/IAMService/interfaces"
+	"github.com/yyboo586/common/logUtils"
 )
 
 func setupJWTTest(t *testing.T) (*sql.DB, sqlmock.Sqlmock, interfaces.DBJWT) {
 	db, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 
+	logger, _ := logUtils.NewLogger("debug")
+	SetLogger(logger)
+
 	return db, mock, &dbJWT{dbPool: db}
 }
 
 func TestAddKeySet(t *testing.T) {
-
 	convey.Convey("Test DBJWT AddKeySet()", t, func() {
 		db, mock, jwt := setupJWTTest(t)
 		defer db.Close()
@@ -45,24 +48,32 @@ func TestAddKeySet(t *testing.T) {
 				t.Errorf("there were unfulfilled expectations: %s", err)
 			}
 		})
-		convey.Convey("数据库错误", func() {
-			mock.ExpectExec("INSERT INTO t_jwt_keys").
-				WillReturnError(sql.ErrConnDone)
+		convey.Convey("database error", func() {
+			mock.ExpectBegin()
+			mock.ExpectPrepare("INSERT INTO t_jwt_keys").WillReturnError(errDatabase)
+			mock.ExpectRollback()
 
 			err := jwt.AddKeySet("test-set", keySet)
 
-			assert.Equal(t, sql.ErrConnDone, err)
+			assert.Equal(t, errDatabase, err)
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("there were unfulfilled expectations: %s", err)
 			}
 		})
 		convey.Convey("添加成功", func() {
-			// 预期的SQL执行
+			// 添加事务相关的期望
+			mock.ExpectBegin()
+			mock.ExpectPrepare("INSERT INTO t_jwt_keys").
+				ExpectExec().
+				WithArgs("key1", sqlmock.AnyArg(), "test-set").
+				WillReturnResult(sqlmock.NewResult(1, 1))
 			mock.ExpectExec("INSERT INTO t_jwt_keys").
-				WithArgs("key1", sqlmock.AnyArg(), "test-set", "key2", sqlmock.AnyArg(), "test-set").
-				WillReturnResult(sqlmock.NewResult(1, 2))
+				WithArgs("key2", sqlmock.AnyArg(), "test-set").
+				WillReturnResult(sqlmock.NewResult(2, 1))
+			mock.ExpectCommit()
 
 			err := jwt.AddKeySet("test-set", keySet)
+
 			assert.Equal(t, nil, err)
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("there were unfulfilled expectations: %s", err)

@@ -2,6 +2,7 @@ package interfaces
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
@@ -52,4 +53,37 @@ type LogicsJWT interface {
 	GetPublicKey(kid string) (key *jose.JSONWebKey, err error)
 
 	RevokeToken(jwtTokenStr string) error
+}
+
+type OutboxBussinessType int
+
+const (
+	_                OutboxBussinessType = iota
+	UserCreatedEMAIL OutboxBussinessType = iota
+	UserCreatedMQ
+)
+
+type OutboxMessageStatus int
+
+const (
+	_                            OutboxMessageStatus = iota
+	OutboxMessageStatusUnhandled                     // 未处理
+	OutboxMessageStatusHandled                       // 已处理
+	OutboxMessageStatusError                         // 处理失败
+)
+
+type OutboxMessage struct {
+	ID     string
+	Op     OutboxBussinessType
+	Msg    []byte
+	Status OutboxMessageStatus
+}
+
+type OutboxHandler func(ctx context.Context, msg *OutboxMessage) error
+
+type LogicsOutbox interface {
+	// 添加消息
+	AddMessage(ctx context.Context, tx *sql.Tx, op OutboxBussinessType, data []byte) error
+	// 注册消息处理函数
+	RegisterHandler(op OutboxBussinessType, handler OutboxHandler)
 }

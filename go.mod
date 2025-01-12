@@ -10,6 +10,7 @@ require (
 	github.com/go-mail/mail/v2 v2.3.0
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/golang/mock v1.6.0
+	github.com/nsqio/go-nsq v1.1.0
 	github.com/smartystreets/goconvey v1.8.1
 	github.com/stretchr/testify v1.10.0
 	github.com/xeipuuv/gojsonschema v1.2.0
@@ -33,6 +34,7 @@ require (
 	github.com/go-playground/validator/v10 v10.23.0 // indirect
 	github.com/go-sql-driver/mysql v1.8.1 // indirect
 	github.com/goccy/go-json v0.10.3 // indirect
+	github.com/golang/snappy v0.0.1 // indirect
 	github.com/gopherjs/gopherjs v1.17.2 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/jtolds/gls v4.20.0+incompatible // indirect

@@ -2,12 +2,15 @@ package logics
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"net/http"
 	"regexp"
 	"strings"
 	"sync"
 
 	"github.com/yyboo586/IAMService/dbaccess"
+	"github.com/yyboo586/IAMService/drivenadapters"
 	"github.com/yyboo586/IAMService/interfaces"
 	"github.com/yyboo586/common/logUtils"
 
@@ -25,10 +28,13 @@ var (
 type user struct {
 	pwdRegex  *regexp.Regexp
 	nameRegex *regexp.Regexp
+	dbPool    *sql.DB
 	logger    *logUtils.Logger
 	mailer    interfaces.LogicsMailer
 	jwt       interfaces.LogicsJWT
+	outbox    interfaces.LogicsOutbox
 	dbUser    interfaces.DBUser
+	mq        interfaces.DrivenMQ
 }
 
 func NewUser() interfaces.LogicsUser {
@@ -37,12 +43,31 @@ func NewUser() interfaces.LogicsUser {
 			pwdRegex:  regexp.MustCompile(`^[a-zA-Z0-9]{6,12}$`),
 			nameRegex: regexp.MustCompile(`^[\p{Han}a-zA-Z0-9]{1,10}$`),
 			logger:    loggerInstance,
+			dbPool:    dbPoolInstance,
 			mailer:    NewLogicsMailer(),
 			jwt:       NewLogicsJWT(),
+			outbox:    NewOutbox(),
 			dbUser:    dbaccess.NewUser(),
+			mq:        drivenadapters.NewMQ(),
 		}
 	})
+
+	u.outbox.RegisterHandler(interfaces.UserCreatedMQ, u.Handle)
+
 	return u
+}
+
+func (u *user) Handle(ctx context.Context, msg *interfaces.OutboxMessage) error {
+	switch msg.Op {
+	case interfaces.UserCreatedMQ:
+		err := u.mq.Publish(ctx, "user_created", msg.Msg)
+		if err != nil {
+			u.logger.Errorf("failed to publish message to mq: %v", err)
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (u *user) Create(ctx context.Context, userInfo *interfaces.User) (err error) {
@@ -69,28 +94,25 @@ func (u *user) Create(ctx context.Context, userInfo *interfaces.User) (err error
 	userInfo.Password = string(cipherText)
 	userInfo.ID = uuid.Must(uuid.NewV4()).String()
 
-	if err = u.dbUser.Create(userInfo); err != nil {
-		u.logger.Errorf("failed to create user: %v", err)
-		return rest.NewHTTPError(http.StatusInternalServerError, "服务器内部错误，请联系管理员", nil)
-	}
+	return withTransaction(u.dbPool, func(tx *sql.Tx) (err error) {
+		if err = u.dbUser.Create(tx, userInfo); err != nil {
+			u.logger.Errorf("failed to create user: %v", err)
+			return rest.NewHTTPError(http.StatusInternalServerError, "服务器内部错误，请联系管理员", nil)
+		}
 
-	// 不保证可以发送成功
-	if userInfo.Email != "" {
-		go func() {
-			msg := &interfaces.MailMessage{
-				ID: userInfo.ID,
-				To: userInfo.Email,
-			}
+		userInfo.Password = ""
+		data, err := json.Marshal(userInfo)
+		if err != nil {
+			u.logger.Errorf("failed to marshal user info: %v", err)
+			return rest.NewHTTPError(http.StatusInternalServerError, "服务器内部错误，请联系管理员", nil)
+		}
+		if err = u.outbox.AddMessage(ctx, tx, interfaces.UserCreatedMQ, data); err != nil {
+			u.logger.Errorf("failed to add message to outbox: %v", err)
+			return rest.NewHTTPError(http.StatusInternalServerError, "服务器内部错误，请联系管理员", nil)
+		}
 
-			if err = u.mailer.SendMail(ctx, interfaces.UserWelcome, msg); err != nil {
-				u.logger.Errorf("failed to send email: %v", err)
-			} else {
-				u.logger.Infof("send email successfully")
-			}
-		}()
-	}
-
-	return nil
+		return nil
+	})
 }
 
 func (u *user) Login(name, passwd string) (id string, jwtTokenStr string, err error) {

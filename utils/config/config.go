@@ -49,6 +49,6 @@ var defaultConfig = Config{
 	Logger: struct {
 		Level string
 	}{
-		Level: "debug",
+		Level: "info",
 	},
 }

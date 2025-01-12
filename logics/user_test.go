@@ -1,6 +1,9 @@
 package logics
 
 import (
+	"database/sql"
+
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/yyboo586/IAMService/interfaces"
 	"github.com/yyboo586/IAMService/interfaces/mock"
 	"github.com/yyboo586/common/logUtils"
@@ -19,17 +22,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func setupUserTest(jwt interfaces.LogicsJWT, dbUser interfaces.DBUser) interfaces.LogicsUser {
-	loggerInstance, err := logUtils.NewLogger("debug")
-	if err != nil {
-		panic(err)
-	}
+func setupUserTest(dbPool *sql.DB, jwt interfaces.LogicsJWT, outbox interfaces.LogicsOutbox, dbUser interfaces.DBUser) interfaces.LogicsUser {
+	loggerInstance, _ := logUtils.NewLogger("debug")
 
 	return &user{
 		pwdRegex:  regexp.MustCompile(`^[a-zA-Z0-9]{6,12}$`),
 		nameRegex: regexp.MustCompile(`^[\p{Han}a-zA-Z0-9]{1,6}$`),
+		dbPool:    dbPool,
 		logger:    loggerInstance,
 		jwt:       jwt,
+		outbox:    outbox,
 		dbUser:    dbUser,
 	}
 }
@@ -39,9 +41,16 @@ func TestCreate(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
+		db, dbmock, err := sqlmock.New()
+		assert.Equal(t, nil, err)
+		defer db.Close()
+
 		jwt := mock.NewMockLogicsJWT(ctrl)
+		outbox := mock.NewMockLogicsOutbox(ctrl)
 		dbUser := mock.NewMockDBUser(ctrl)
-		user := setupUserTest(jwt, dbUser)
+		user := setupUserTest(db, jwt, outbox, dbUser)
+
+		ctx := context.Background()
 		validUser := &interfaces.User{
 			Name:     "tom",
 			Password: "123456",
@@ -65,7 +74,7 @@ func TestCreate(t *testing.T) {
 						Password: "TestPass123",
 					}
 
-					err := user.Create(context.Background(), invalidUser)
+					err := user.Create(ctx, invalidUser)
 
 					assert.Equal(t, tc.expectedErr, err)
 				})
@@ -89,7 +98,7 @@ func TestCreate(t *testing.T) {
 						Password: tc.password,
 					}
 
-					err := user.Create(context.Background(), invalidUser)
+					err := user.Create(ctx, invalidUser)
 
 					assert.Equal(t, tc.expectedErr, err)
 				})
@@ -98,24 +107,25 @@ func TestCreate(t *testing.T) {
 		convey.Convey("数据库错误1-GetUserInfoByName", func() {
 			dbUser.EXPECT().GetUserInfoByName(gomock.Any()).Return(nil, false, errors.New("database error"))
 
-			err := user.Create(context.Background(), validUser)
-
-			assert.Equal(t, rest.NewHTTPError(http.StatusInternalServerError, "服务器内部错误，请联系管理员", nil), err)
-		})
-		convey.Convey("数据库错误2-Create", func() {
-			dbUser.EXPECT().GetUserInfoByName(gomock.Any()).Return(nil, false, nil)
-			dbUser.EXPECT().Create(gomock.Any()).Return(errors.New("database error"))
-			err := user.Create(context.Background(), validUser)
-
+			err := user.Create(ctx, validUser)
 			assert.Equal(t, rest.NewHTTPError(http.StatusInternalServerError, "服务器内部错误，请联系管理员", nil), err)
 		})
 		convey.Convey("用户名已存在", func() {
-
 			dbUser.EXPECT().GetUserInfoByName(gomock.Any()).Return(nil, true, nil)
 
-			err := user.Create(context.Background(), validUser)
+			err := user.Create(ctx, validUser)
 
 			assert.Equal(t, rest.NewHTTPError(http.StatusConflict, "用户名已存在", nil), err)
+		})
+		convey.Convey("数据库错误2-Create", func() {
+			dbUser.EXPECT().GetUserInfoByName(gomock.Any()).Return(nil, false, nil)
+			dbmock.ExpectBegin()
+			dbUser.EXPECT().Create(gomock.Any(), gomock.Any()).Return(errors.New("database error"))
+			dbmock.ExpectRollback()
+
+			err := user.Create(ctx, validUser)
+
+			assert.Equal(t, rest.NewHTTPError(http.StatusInternalServerError, "服务器内部错误，请联系管理员", nil), err)
 		})
 		convey.Convey("创建成功", func() {
 			testCases := []struct {
@@ -130,14 +140,17 @@ func TestCreate(t *testing.T) {
 				{"六个中文字符", "TestPaTestPa"},
 			}
 			for _, tc := range testCases {
-				validUser := &interfaces.User{
+				validUser = &interfaces.User{
 					Name:     tc.name,
 					Password: tc.password,
 				}
 				dbUser.EXPECT().GetUserInfoByName(gomock.Any()).Return(nil, false, nil)
-				dbUser.EXPECT().Create(gomock.Any()).Return(nil)
+				dbmock.ExpectBegin()
+				dbUser.EXPECT().Create(gomock.Any(), gomock.Any()).Return(nil)
+				outbox.EXPECT().AddMessage(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				dbmock.ExpectCommit()
 
-				err := user.Create(context.Background(), validUser)
+				err := user.Create(ctx, validUser)
 
 				assert.Equal(t, nil, err)
 			}
@@ -152,9 +165,13 @@ func TestLogin(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
+		db, _, err := sqlmock.New()
+		assert.Equal(t, nil, err)
+		defer db.Close()
+
 		jwt := mock.NewMockLogicsJWT(ctrl)
 		dbUser := mock.NewMockDBUser(ctrl)
-		user := setupUserTest(jwt, dbUser)
+		user := setupUserTest(db, jwt, nil, dbUser)
 		// 测试参数校验
 		convey.Convey("参数校验", func() {
 			testCases := []struct {
@@ -243,9 +260,13 @@ func TestGetUserInfo(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
+		db, _, err := sqlmock.New()
+		assert.Equal(t, nil, err)
+		defer db.Close()
+
 		jwt := mock.NewMockLogicsJWT(ctrl)
 		dbUser := mock.NewMockDBUser(ctrl)
-		user := setupUserTest(jwt, dbUser)
+		user := setupUserTest(db, jwt, nil, dbUser)
 
 		claims := map[string]interface{}{"id": "id"}
 		ctx := context.WithValue(context.WithValue(context.Background(), interfaces.TokenKey, "jwtToken"), interfaces.ClaimsKey, claims)

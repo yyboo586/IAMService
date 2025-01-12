@@ -27,3 +27,15 @@ CREATE TABLE IF NOT EXISTS `t_jwt_blacklist` (
   `created_at` timestamp DEFAULT current_timestamp,
   PRIMARY KEY (`id`)
 )ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `t_outbox` (
+  `id` varchar(36) NOT NULL,
+  `op` int NOT NULL,
+  `msg` varchar(1024) NOT NULL,
+  `status` int NOT NULL DEFAULT 0, -- 1 未处理，2 已处理, 3 异常
+  `created_at` timestamp DEFAULT current_timestamp,
+  `updated_at` timestamp DEFAULT NULL ON UPDATE current_timestamp,
+  PRIMARY KEY (`id`),
+  KEY `idx_status_created_at` (`status`, `created_at`),
+  KEY `idx_status_updated_at` (`status`, `updated_at`)
+)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
