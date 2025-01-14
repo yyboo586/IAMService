@@ -20,10 +20,18 @@ type DBUser interface {
 	UpdateLoginTime(id string) error
 }
 
+type KeyStatus int
+
+const (
+	KeyStatusValid   KeyStatus = 1
+	KeyStatusExpired KeyStatus = 2
+)
+
 type DBJWT interface {
 	AddKeySet(setID string, keySet *jose.JSONWebKeySet) error
 	GetKeySet(setID string) (kSet *jose.JSONWebKeySet, err error)
 	GetKey(kid string) (key *jose.JSONWebKey, err error)
+	SetKeyStatus(kid string, status KeyStatus) error
 
 	AddBlacklist(id string) error
 	GetBlacklist(id string) (exists bool, err error)

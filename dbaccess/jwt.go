@@ -119,3 +119,8 @@ func (j *dbJWT) GetBlacklist(id string) (exists bool, err error) {
 
 	return count > 0, nil
 }
+
+// todo: 实现
+func (j *dbJWT) SetKeyStatus(_ string, _ interfaces.KeyStatus) error {
+	return nil
+}

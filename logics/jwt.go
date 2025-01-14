@@ -24,28 +24,69 @@ import (
 
 var (
 	logicsJWTOnce sync.Once
-	lJWT          interfaces.LogicsJWT
+	lJWT          *logicsJWT
 )
 
 type logicsJWT struct {
+	keyRotationInterval time.Duration // 密钥轮换间隔
+	cacheLock           sync.RWMutex
+	keysCache           map[string]*jose.JSONWebKeySet // key: setID
+	logger              *logUtils.Logger
+
 	dbJWT interfaces.DBJWT
-
-	cacheLock sync.RWMutex
-	keysCache map[string]*jose.JSONWebKeySet
-
-	logger *logUtils.Logger
 }
 
 func NewLogicsJWT() interfaces.LogicsJWT {
 	logicsJWTOnce.Do(func() {
 		lJWT = &logicsJWT{
-			dbJWT:     dbaccess.NewDBJWT(),
-			keysCache: make(map[string]*jose.JSONWebKeySet),
-			logger:    loggerInstance,
+			keyRotationInterval: 24 * time.Hour,
+			dbJWT:               dbaccess.NewDBJWT(),
+			keysCache:           make(map[string]*jose.JSONWebKeySet),
+			logger:              loggerInstance,
 		}
+
+		go lJWT.rotateKeys()
 	})
 
 	return lJWT
+}
+
+func (j *logicsJWT) rotateKeys() {
+	defer func() {
+		if r := recover(); r != nil {
+			j.logger.Error(r)
+		}
+	}()
+
+	j.logger.Info("rotateKeys goroutine start")
+	ticker := time.NewTicker(j.keyRotationInterval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		// 分析目前有哪些setID
+		j.cacheLock.RLock()
+		setIDMap := make(map[string]string, len(j.keysCache))
+		for k, v := range j.keysCache {
+			setIDMap[k] = v.Keys[0].Algorithm
+		}
+		j.cacheLock.RUnlock()
+
+		j.cacheLock.Lock()
+		// 为每一个setID更换密钥, 并更新缓存
+		for setID, alg := range setIDMap {
+			j.logger.Debugf("before rotateKeys: len(keysCache[%s].Keys): %d", setID, len(j.keysCache[setID].Keys))
+			kSet, err := j.generateAndPersistJWKSet(setID, alg, "", "sig")
+			if err != nil {
+				j.logger.Error(err)
+				continue
+			}
+			// 将新密钥添加到现有密钥集前面
+			j.keysCache[setID].Keys = append(kSet.Keys, j.keysCache[setID].Keys...)
+
+			j.logger.Debugf(" after rotateKeys: len(keysCache[%s].Keys): %d", setID, len(j.keysCache[setID].Keys))
+		}
+		j.cacheLock.Unlock()
+	}
 }
 
 func (j *logicsJWT) Sign(userID string, claims map[string]interface{}, setID, alg string) (jwtTokenStr string, err error) {
@@ -168,6 +209,7 @@ func (j *logicsJWT) loadORGenerateKeys(setID, alg string) (*jose.JSONWebKey, err
 	j.cacheLock.Lock()
 	defer j.cacheLock.Unlock()
 
+	// 再次检查是否存在：因为在上面的获取读锁过程中，其他goroutine可能已经写入
 	if kSet, ok := j.keysCache[setID]; ok {
 		return &kSet.Keys[0], nil
 	}

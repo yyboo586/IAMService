@@ -14,7 +14,7 @@ require (
 	github.com/smartystreets/goconvey v1.8.1
 	github.com/stretchr/testify v1.10.0
 	github.com/xeipuuv/gojsonschema v1.2.0
-	github.com/yyboo586/common v0.0.0-20241220133833-5b2d1b9edc95
+	github.com/yyboo586/common v0.0.0-20250114061544-f1ba827a7ad0
 	golang.org/x/crypto v0.30.0
 )
 

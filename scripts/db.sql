@@ -22,6 +22,10 @@ CREATE TABLE IF NOT EXISTS `t_jwt_keys` (
   KEY `idx_created_at` (`created_at`)
 )ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+ALTER TABLE `t_jwt_keys` DROP KEY `idx_sid`;
+ALTER TABLE `t_jwt_keys` ADD KEY `idx_sid_created_at` (`sid`, `created_at`);
+ALTER TABLE `t_jwt_keys` ADD COLUMN `status` int NOT NULL DEFAULT 0; -- 1 有效, 2 过期
+
 CREATE TABLE IF NOT EXISTS `t_jwt_blacklist` (
   `id` varchar(36) NOT NULL,
   `created_at` timestamp DEFAULT current_timestamp,
