@@ -22,6 +22,7 @@ type outbox struct {
 	deleteBatchSize int
 	deleteInterval  time.Duration // 删除间隔, 避免数据库压力过大
 	backupInterval  time.Duration // 消息推送失败，休眠间隔
+	sleepInterval   time.Duration // 没有消息时，休眠间隔
 	msgChan         chan struct{} // 消息通道
 	dbPool          *sql.DB
 	logger          *logUtils.Logger
@@ -35,6 +36,7 @@ func NewOutbox() interfaces.LogicsOutbox {
 			deleteBatchSize: 100,
 			deleteInterval:  500 * time.Millisecond,
 			backupInterval:  5 * time.Second,
+			sleepInterval:   30 * time.Second,
 			msgChan:         make(chan struct{}, 1),
 			dbPool:          dbPoolInstance,
 			logger:          loggerInstance,
@@ -69,35 +71,40 @@ func (o *outbox) AddMessage(ctx context.Context, tx *sql.Tx, op interfaces.Outbo
 		return err
 	}
 
-	// 非阻塞方式发送通知，通知推送线程有新消息
+	return nil
+}
+
+// 非阻塞方式发送通知，通知推送线程有新消息
+func (o *outbox) Notify() {
 	select {
 	case o.msgChan <- struct{}{}:
 	default:
+		o.logger.Debug("outbox: notify channel is full, skipping notify")
 	}
-	return nil
 }
 
 func (o *outbox) pushWorker() {
 	ctx := context.Background()
 	for {
 		msg, exists, err := o.dbOutbox.Get(ctx, interfaces.OutboxMessageStatusUnhandled)
+		o.logger.Debugf("outbox: get outbox message: msg.ID:%v, exists: %v, err: %v", msg.ID, exists, err)
 		if err != nil {
 			o.logger.Error("outbox: failed to get outbox message", err)
 			continue
 		}
-		if !exists {
-			select {
-			case <-o.msgChan:
-				continue
-			case <-time.After(o.backupInterval):
-				o.logger.Debug("outbox: push goroutine: no message to handle")
-				continue
+		if exists {
+			err := o.messageReply(ctx, msg)
+			if err != nil {
+				o.logger.Error("outbox: failed to reply message", err)
+				time.Sleep(o.backupInterval)
 			}
+			continue
 		}
-
-		if err := o.messageReply(ctx, msg); err != nil {
-			o.logger.Error("outbox: failed to reply message", err)
-			time.Sleep(o.backupInterval)
+		select {
+		case <-o.msgChan:
+			o.logger.Debug("outbox: push goroutine: signal notify")
+		case <-time.After(o.sleepInterval):
+			o.logger.Debug("outbox: push goroutine: no message to handle")
 		}
 	}
 }

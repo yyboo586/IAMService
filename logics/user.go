@@ -94,7 +94,7 @@ func (u *user) Create(ctx context.Context, userInfo *interfaces.User) (err error
 	userInfo.Password = string(cipherText)
 	userInfo.ID = uuid.Must(uuid.NewV4()).String()
 
-	return withTransaction(u.dbPool, func(tx *sql.Tx) (err error) {
+	if err = withTransaction(u.dbPool, func(tx *sql.Tx) (err error) {
 		if err = u.dbUser.Create(tx, userInfo); err != nil {
 			u.logger.Errorf("failed to create user: %v", err)
 			return rest.NewHTTPError(http.StatusInternalServerError, "服务器内部错误，请联系管理员", nil)
@@ -112,7 +112,14 @@ func (u *user) Create(ctx context.Context, userInfo *interfaces.User) (err error
 		}
 
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+
+	// 确保事务提交后，再唤醒推送 goroutine
+	u.outbox.Notify()
+
+	return nil
 }
 
 func (u *user) Login(name, passwd string) (id string, jwtTokenStr string, err error) {

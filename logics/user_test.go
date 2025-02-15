@@ -149,6 +149,7 @@ func TestCreate(t *testing.T) {
 				dbUser.EXPECT().Create(gomock.Any(), gomock.Any()).Return(nil)
 				outbox.EXPECT().AddMessage(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 				dbmock.ExpectCommit()
+				outbox.EXPECT().Notify()
 
 				err := user.Create(ctx, validUser)
 

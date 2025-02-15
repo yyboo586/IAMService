@@ -86,4 +86,6 @@ type LogicsOutbox interface {
 	AddMessage(ctx context.Context, tx *sql.Tx, op OutboxBussinessType, data []byte) error
 	// 注册消息处理函数
 	RegisterHandler(op OutboxBussinessType, handler OutboxHandler)
+	// 唤醒推送 goroutine
+	Notify()
 }
